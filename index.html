@@ -11,6 +11,7 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/crypto-js/4.1.1/crypto-js.min.js"></script>
 
     <script>
         tailwind.config = {
@@ -83,6 +84,25 @@
 </head>
 
 <body class="bg-slate-900 text-gray-200 antialiased h-screen flex overflow-hidden">
+
+    <!-- Security Lock Modal -->
+    <div id="securityModal" class="fixed inset-0 bg-slate-900 z-[100] hidden flex items-center justify-center">
+        <div class="glass p-8 rounded-xl w-full max-w-md border border-slate-700 text-center shadow-2xl">
+            <div
+                class="w-16 h-16 bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-4 text-accent-red">
+                <i class="fa-solid fa-lock text-2xl"></i>
+            </div>
+            <h2 class="text-xl font-bold text-white mb-2">Restricted Access</h2>
+            <p class="text-sm text-gray-400 mb-6">This dashboard is encrypted. Please enter the password to decrypt the
+                data sources.</p>
+            <input type="password" id="securityPassword"
+                class="w-full bg-slate-900 border border-slate-600 rounded p-3 text-white focus:border-accent-red outline-none mb-4"
+                placeholder="Enter Password">
+            <button onclick="unlockDashboard()"
+                class="w-full bg-accent-red hover:bg-red-600 text-white font-bold py-3 rounded transition-colors shadow-lg">Unlock
+                Dashboard</button>
+        </div>
+    </div>
 
     <!-- Loading Spinner -->
     <div id="loader" class="loading-overlay">
@@ -357,6 +377,30 @@
                 </div>
             </div>
 
+            <!-- Security Section -->
+            <div class="border-t border-slate-700 pt-4 mb-4">
+                <h4 class="text-sm font-bold text-gray-300 mb-2 flex items-center gap-2">
+                    <i class="fa-solid fa-shield-halved text-accent-green"></i> Security
+                </h4>
+                <p class="text-[10px] text-gray-500 mb-2">Encrypt your source URLs so they are not visible in the code.
+                </p>
+                <div class="flex gap-2">
+                    <input type="password" id="encryptPassword" placeholder="Set Password"
+                        class="flex-1 bg-slate-900 border border-slate-600 rounded px-2 py-1 text-xs text-white focus:border-accent-green outline-none">
+                    <button onclick="generateEncryptedConfig()"
+                        class="bg-slate-700 hover:bg-slate-600 text-white px-3 py-1 rounded text-xs border border-slate-600 transition-colors">
+                        Generate Encrypted Config
+                    </button>
+                </div>
+                <div id="encryptOutput" class="hidden mt-2">
+                    <p class="text-[10px] text-accent-yellow mb-1">Copy the object below, replace
+                        <code>SECURE_DEFAULTS</code> in the code, then set <code>SECURE_MODE = true</code>.
+                    </p>
+                    <textarea id="encryptOutputText"
+                        class="w-full h-24 bg-slate-950 border border-slate-700 rounded p-2 text-[10px] font-mono text-green-400 outline-none"></textarea>
+                </div>
+            </div>
+
             <div class="mb-4 flex items-center gap-3">
                 <input type="checkbox" id="settingsCorsProxy"
                     class="w-5 h-5 rounded border-slate-600 bg-slate-800 text-accent-blue focus:ring-accent-blue">
@@ -523,26 +567,34 @@
         // 🔧 CONFIGURATION
         // ==========================================
 
-        // 🚨 REPLACE THIS WITH YOUR OPENSHEET URL
-        // Steps: 1. Share Google Sheet -> Anyone with link -> Viewer
-        //        2. Use format: https://opensheet.elk.sh/SPREADSHEET_ID/SHEET_NAME
-        const DATA_SOURCE_URL = 'https://opensheet.elk.sh/SPREADSHEET_ID/SHEET_NAME';
+        // --- SECURITY SETTINGS ---
+        // 1. To secure your links, open Settings > Security in the dashboard.
+        // 2. Generate the encrypted config using a password.
+        // 3. Paste the result into SECURE_DEFAULTS below and set SECURE_MODE to true.
+        // 4. You can then remove the links from PLAIN_DEFAULTS.
+
+        const SECURE_MODE = true; // Set to TRUE after pasting encrypted defaults
+
+        const SECURE_DEFAULTS = "U2FsdGVkX193obTYTyespP3TLxsiJGVDvdWC7qBNVXPpSJlYsRr1RcZuQv9HdbEc6UMT004jAeMntiAOhmsQLDy1OWkK1zSU5/kVxDo2u1xIwI4AWH/K51spH2HXKeT4f8LQJcuDadL64HYNFzb0pbVp0mDH9wGCoqZtdH4g9oLtBQoNmOHdH1PfUtHYUi7w7kHtoAFz3d0D0P3vRjubE/BZfH7oI49OzKZ/Wi9KC672GpFouGYt15hFLtih+5E4SR/msSgoCzSvgYv3SNO3PnbbwDIAaIrh3VFmidfvra9TPNfBO8XEZrE5QrlKDwV1XnHIeu4qbfyt6pNfwiMXzdfpI3Khr3O36o5jqV1CGquuIxA7OuIFHaN6DFRhHipsmb519oOG03eB6GxOQPNmrWdJSSMyHezHuUFddLdgVx9KJky8rh0fGU4PLYGA+gPb2m2w9bgqdkQOfS+/VmVER29cjx62LLKYT41FDgSsko8/txM9kvXBV/RXYmf+Kv58YB0tLg7BeguIhhJRejyoG94dfQ+WUUY5XCVC9KZ0TKCZTF/nXougipn8jCIOW3kioEYPYwRUMq78EB1KbwPsETMMA3IZtAgpupLgDSMVp02U/VYomD+rIWwgS10YYLbJeDr1VboDCnPJut6O3WcPy8vIqa4p1ZS1OscbB4QDwNumA6Drh6lFqWeYUfuS25mlM7x2QYqyw87MPvdvMwgowRTnX03j5YqKpn/Hvtl/An11+QgwM6vpXr1dOcPpWH+IjK2FB+qc3uU9Ifo9X0ScOuEuoprJKt7KQkX8C/eXHRk4rQQykr7WTK6xfPB00yutHAn3iHzFBoM9Gq3suOCoXg==";
+
+        const PLAIN_DEFAULTS = {
+            'Master': '',
+            'KSA_Widget': '',
+            'UAE_Widget': '',
+            'ZA_Widget': '',
+            'KSA_Whatsapp': '',
+            'UAE_Whatsapp': '',
+            'ZA_Whatsapp': ''
+        };
 
         // Global Data Storage
         let rawData = [];
         let filteredData = [];
         let charts = {}; // To store chart instances
+        let activeDefaults = {}; // Will hold the decrypted or plain defaults
 
-        // Database State
-        let database = {
-            'Master': { data: [], updated: 'Never', url: DATA_SOURCE_URL },
-            'KSA_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1b3IUeyvxEDitJmwpbx5lWHYVbQYS1eduEM3vt6T1qUU/sheet1' },
-            'UAE_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1oyLN9PdkdqO8Z30xxwg8MBId2btF-vtqu-TQPfxEPL4/sheet1' },
-            'ZA_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1GY-xV8yWixGz7w7U6zDic2Bh567lmj6YpIPtEbc9oEI/sheet1' },
-            'KSA_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1KxbGpcmUl1G6miFRE5QPKrACJ8E7Tfp0Yczm2VsE5VA/sheet1' },
-            'UAE_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1KAuZqbi6taOO600sc1bt3U3emWIwDBTl2mQXYiFPyqE/sheet1' },
-            'ZA_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1dhxifWyC0Bux3iY7zbU4tcUBj-fm4F9c1wbIRmE8E44/sheet1' }
-        };
+        // Database State (Initialized empty, populated on load)
+        let database = {};
 
         // ==========================================
         // 🗄️ INDEXED DB (Storage Fix)
@@ -616,7 +668,22 @@
         // ==========================================
         // � INITIALIZATION
         // ==========================================
+
+        // Pre-Init: Check Security
+        if (SECURE_MODE) {
+            document.getElementById('securityModal').classList.remove('hidden');
+            document.getElementById('loader').classList.add('hidden'); // Hide loader, show lock
+        } else {
+            activeDefaults = PLAIN_DEFAULTS;
+            initializeDatabaseState();
+        }
+
         window.onload = async function () {
+            if (SECURE_MODE) return; // Wait for unlock
+            await startApp();
+        };
+
+        async function startApp() {
             // Load Database from IndexedDB
             try {
                 const rows = await dbLoadAllRegionsRegions();
@@ -629,7 +696,7 @@
                     if (database[key]) {
                         // Use saved URL if exists, otherwise keep default
                         const savedUrl = row.url;
-                        const defaultUrl = database[key].url;
+                        const defaultUrl = activeDefaults[key] || '';
 
                         database[key] = {
                             data: row.data || [],
@@ -669,7 +736,71 @@
 
             // Hide loader after initialization
             document.getElementById('loader').classList.add('hidden');
-        };
+        }
+
+        function initializeDatabaseState() {
+            // Populate database object structure from activeDefaults
+            database = {};
+            Object.keys(activeDefaults).forEach(key => {
+                database[key] = { data: [], updated: 'Never', url: activeDefaults[key] };
+            });
+        }
+
+        // ==========================================
+        // 🔐 SECURITY FUNCTIONS
+        // ==========================================
+        function unlockDashboard() {
+            const password = document.getElementById('securityPassword').value;
+            try {
+                // Attempt to decrypt
+                const decryptedBytes = CryptoJS.AES.decrypt(SECURE_DEFAULTS, password);
+                const decryptedString = decryptedBytes.toString(CryptoJS.enc.Utf8);
+
+                if (!decryptedString) throw new Error("Invalid Password");
+
+                activeDefaults = JSON.parse(decryptedString);
+
+                // Success
+                document.getElementById('securityModal').classList.add('hidden');
+                document.getElementById('loader').classList.remove('hidden');
+                initializeDatabaseState();
+                startApp();
+
+            } catch (e) {
+                alert("Incorrect Password or Corrupted Data.");
+                console.error(e);
+            }
+        }
+
+        function generateEncryptedConfig() {
+            const password = document.getElementById('encryptPassword').value;
+            if (!password) {
+                alert("Please enter a password to encrypt with.");
+                return;
+            }
+
+            // We encrypt the PLAIN_DEFAULTS object
+            // Note: If you have updated URLs in the UI and saved them to DB, 
+            // this only encrypts the hardcoded defaults. 
+            // To encrypt current state, we'd need to pull from 'database' object.
+            // For now, we encrypt the PLAIN_DEFAULTS as requested.
+
+            try {
+                const encrypted = CryptoJS.AES.encrypt(JSON.stringify(PLAIN_DEFAULTS), password).toString();
+
+                // Format for display
+                const output = `// Encrypted with password: "${password}"\n` +
+                    `const SECURE_DEFAULTS = ${JSON.stringify(encrypted)};`;
+
+                const outArea = document.getElementById('encryptOutput');
+                const outText = document.getElementById('encryptOutputText');
+                outArea.classList.remove('hidden');
+                outText.value = output;
+                outText.select();
+            } catch (e) {
+                alert("Encryption failed: " + e.message);
+            }
+        }
 
         // ==========================================
         // 📥 DATA FETCHING
@@ -682,7 +813,7 @@
 
             // Get URL from database state
             const entry = database[regionKey];
-            const targetUrl = entry.url && entry.url.trim() !== '' ? entry.url : DATA_SOURCE_URL;
+            const targetUrl = entry.url && entry.url.trim() !== '' ? entry.url : '';
 
             // Check for Proxy Setting
             const useProxy = localStorage.getItem('cx_use_proxy') === 'true';
@@ -784,7 +915,7 @@
             // Filter to only sync regions that have a valid, non-placeholder URL
             const validRegions = regions.filter(r => {
                 const entry = database[r];
-                const url = entry.url && entry.url.trim() !== '' ? entry.url : DATA_SOURCE_URL;
+                const url = entry.url && entry.url.trim() !== '' ? entry.url : '';
                 return url && !url.includes('SPREADSHEET_ID');
             });
 
