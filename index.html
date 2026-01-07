@@ -1,0 +1,1794 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CX Analytics Dashboard</title>
+
+    <!-- Tech Stack: Tailwind CSS, FontAwesome, Chart.js, PapaParse -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
+
+    <script>
+        tailwind.config = {
+            darkMode: 'class',
+            theme: {
+                extend: {
+                    colors: {
+                        slate: {
+                            800: '#1e293b',
+                            900: '#0f172a',
+                        },
+                        accent: {
+                            blue: '#3b82f6',
+                            purple: '#8b5cf6',
+                            red: '#ef4444',
+                            green: '#10b981',
+                            yellow: '#f59e0b'
+                        }
+                    }
+                }
+            }
+        }
+    </script>
+
+    <style>
+        /* Glassmorphism Classes */
+        .glass {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        .loading-overlay {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: #0f172a;
+            z-index: 50;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+        }
+
+        /* Custom Scrollbar */
+        ::-webkit-scrollbar {
+            width: 8px;
+        }
+
+        ::-webkit-scrollbar-track {
+            background: #0f172a;
+        }
+
+        ::-webkit-scrollbar-thumb {
+            background: #334155;
+            border-radius: 4px;
+        }
+
+        ::-webkit-scrollbar-thumb:hover {
+            background: #475569;
+        }
+
+        body {
+            font-family: 'Inter', sans-serif;
+        }
+    </style>
+</head>
+
+<body class="bg-slate-900 text-gray-200 antialiased h-screen flex overflow-hidden">
+
+    <!-- Loading Spinner -->
+    <div id="loader" class="loading-overlay">
+        <div class="animate-spin rounded-full h-16 w-16 border-t-4 border-b-4 border-accent-blue mb-4"></div>
+        <h2 class="text-xl font-bold text-accent-blue animate-pulse">Loading Support Data...</h2>
+        <p class="text-sm text-gray-500 mt-2">Connecting to Data Source</p>
+    </div>
+
+    <!-- Sidebar Filters -->
+    <aside class="w-64 glass h-full flex-shrink-0 flex flex-col p-6 border-r border-slate-700/50 relative z-20">
+        <div class="mb-8 flex items-center gap-3">
+            <div
+                class="w-10 h-10 bg-gradient-to-br from-accent-blue to-accent-purple rounded-lg flex items-center justify-center text-white font-bold">
+                <i class="fa-solid fa-headset"></i>
+            </div>
+            <h1 class="text-xl font-bold tracking-wide">CX Analytics</h1>
+        </div>
+
+        <div class="space-y-6">
+            <!-- Country Selector -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Region</label>
+                <select id="countryFilter"
+                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-sm text-white focus:ring-accent-blue focus:border-accent-blue">
+                    <option value="All">All Regions</option>
+                    <option value="KSA">KSA (Saudi Arabia)</option>
+                    <option value="UAE">UAE (United Arab Emirates)</option>
+                    <option value="ZA">ZA (South Africa)</option>
+                </select>
+            </div>
+
+            <!-- Source Selector -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Source</label>
+                <select id="sourceFilter"
+                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-sm text-white focus:ring-accent-blue focus:border-accent-blue">
+                    <option value="Widget">Chat Widget</option>
+                    <option value="Whatsapp">Whatsapp</option>
+                </select>
+            </div>
+
+            <!-- Date Range -->
+            <div>
+                <label class="block text-sm font-medium text-gray-400 mb-2">Date Range</label>
+                <div class="grid gap-3">
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fa-regular fa-calendar text-gray-500"></i>
+                        </div>
+                        <input type="date" id="startDate"
+                            class="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 p-2 text-xs text-white">
+                    </div>
+                    <div class="relative">
+                        <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
+                            <i class="fa-regular fa-calendar text-gray-500"></i>
+                        </div>
+                        <input type="date" id="endDate"
+                            class="w-full bg-slate-800 border border-slate-600 rounded-lg pl-10 p-2 text-xs text-white">
+                    </div>
+                </div>
+            </div>
+
+            <!-- Compare Toggle -->
+            <div class="flex items-center justify-between p-3 glass rounded-lg border border-slate-700">
+                <span class="text-xs font-medium text-gray-300">Compare Prev. Period</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="compareToggle" class="sr-only peer">
+                    <div
+                        class="w-9 h-5 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-blue rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-blue">
+                    </div>
+                </label>
+            </div>
+
+            <button onclick="applyFilters()"
+                class="w-full bg-gradient-to-r from-accent-blue to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium py-2.5 rounded-lg shadow-lg transition-all transform hover:scale-105">
+                Apply Filters
+            </button>
+        </div>
+
+        <div class="mt-auto pt-6 border-t border-slate-700">
+            <button onclick="openSettings()"
+                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800">
+                <i class="fa-solid fa-database"></i> Data Manager
+            </button>
+            <button onclick="openAIModal()"
+                class="w-full flex items-center justify-center gap-2 text-accent-purple hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-purple/50">
+                <i class="fa-solid fa-wand-magic-sparkles"></i> AI Analyst
+            </button>
+            <button onclick="openN8nModal()"
+                class="w-full flex items-center justify-center gap-2 text-accent-yellow hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-yellow/50">
+                <i class="fa-solid fa-bolt"></i> N8N Control
+            </button>
+            <button onclick="openReportsArchive()"
+                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800">
+                <i class="fa-solid fa-archive"></i> Reports Archive
+            </button>
+            <p id="dataStatusText" class="text-xs text-gray-500 text-center">Data fetched via API / CSV</p>
+        </div>
+    </aside>
+
+    <!-- Main Content -->
+    <main class="flex-1 overflow-y-auto p-8 relative">
+        <!-- Header with Sync Button -->
+        <div class="flex justify-between items-center mb-6">
+            <h2 class="text-2xl font-bold text-white">Dashboard Overview</h2>
+            <div class="flex flex-col items-end">
+                <button onclick="syncAll()" id="syncAllBtn"
+                    class="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 shadow-lg">
+                    <i class="fa-solid fa-rotate"></i> Sync All Data
+                </button>
+                <span id="lastSyncText" class="text-xs text-gray-500 mt-1">Last Sync: Never</span>
+            </div>
+        </div>
+
+        <!-- Section A: Executive KPI Cards -->
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+
+            <!-- Total Volume -->
+            <div class="glass rounded-xl p-5 border-l-4 border-accent-purple relative overflow-hidden">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium uppercase">Total Tickets</p>
+                        <h3 id="kpiTotalVolume" class="text-3xl font-bold text-white mt-2">-</h3>
+                    </div>
+                    <div class="p-2 bg-slate-800 rounded-lg text-accent-purple">
+                        <i class="fa-solid fa-layer-group"></i>
+                    </div>
+                </div>
+                <div id="trendVolume" class="mt-4 text-xs font-medium flex items-center gap-1">
+                    <!-- Dynamic Trend content -->
+                </div>
+            </div>
+
+            <!-- Escalation Rate -->
+            <div class="glass rounded-xl p-5 border-l-4 border-accent-red relative">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium uppercase">Human Escalation</p>
+                        <h3 id="kpiEscalation" class="text-3xl font-bold text-white mt-2">-</h3>
+                    </div>
+                    <div class="p-2 bg-slate-800 rounded-lg text-accent-red">
+                        <i class="fa-solid fa-user-headset"></i>
+                    </div>
+                </div>
+                <div id="trendEscalation" class="mt-4 text-xs font-medium text-gray-400">
+                    Calculated from 'Requested Agent'
+                </div>
+            </div>
+
+            <!-- Sentiment Score -->
+            <div class="glass rounded-xl p-5 border-l-4 border-accent-green">
+                <p class="text-sm text-gray-400 font-medium uppercase mb-2">Sentiment Overview</p>
+                <div class="flex h-4 w-full rounded-full overflow-hidden bg-slate-800 mb-2">
+                    <div id="barPositive" class="bg-accent-green h-full" style="width: 0%"></div>
+                    <div id="barNeutral" class="bg-gray-500 h-full" style="width: 0%"></div>
+                    <div id="barNegative" class="bg-accent-red h-full" style="width: 0%"></div>
+                </div>
+                <div class="flex justify-between text-xs">
+                    <span class="text-accent-green"><i class="fa-regular fa-face-smile"></i> <span
+                            id="valPositive">0%</span></span>
+                    <span class="text-gray-400"><i class="fa-regular fa-face-meh"></i> <span
+                            id="valNeutral">0%</span></span>
+                    <span class="text-accent-red"><i class="fa-regular fa-face-frown"></i> <span
+                            id="valNegative">0%</span></span>
+                </div>
+            </div>
+
+            <!-- Avg AI Messages -->
+            <div class="glass rounded-xl p-5 border-l-4 border-accent-blue">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium uppercase">Avg Bot Msgs/Ticket</p>
+                        <h3 id="kpiAvgMsgs" class="text-3xl font-bold text-white mt-2">-</h3>
+                    </div>
+                    <div class="p-2 bg-slate-800 rounded-lg text-accent-blue">
+                        <i class="fa-solid fa-robot"></i>
+                    </div>
+                </div>
+                <div class="mt-4 text-xs font-medium text-gray-400">
+                    Indicator of automation depth
+                </div>
+            </div>
+        </div>
+
+        <!-- Section B: Charts -->
+        <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-8">
+            <!-- Line Chart: Volume -->
+            <div class="glass rounded-xl p-6 lg:col-span-2">
+                <h3 class="text-lg font-semibold mb-4 text-white">Ticket Volume Over Time</h3>
+                <div class="relative h-64 w-full">
+                    <canvas id="volumeChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Doughnut Chart: Categories -->
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4 text-white">Category Distribution</h3>
+                <div class="relative h-64 w-full flex justify-center">
+                    <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section C: Analysis & Top Issues -->
+        <div class="grid grid-cols-1 lg:grid-cols-2 gap-6 pb-8">
+            <!-- Top Intents Bar Chart -->
+            <div class="glass rounded-xl p-6">
+                <h3 class="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                    <i class="fa-solid fa-crosshairs text-accent-yellow"></i> Top Intents
+                </h3>
+                <div class="relative h-64 w-full">
+                    <canvas id="intentChart"></canvas>
+                </div>
+            </div>
+
+            <!-- Top Recurring Issues List -->
+            <div class="glass rounded-xl p-6 flex flex-col h-80">
+                <h3 class="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                    <i class="fa-solid fa-triangle-exclamation text-accent-red"></i>
+                    Top Recurring Negative Issues
+                </h3>
+                <div id="issuesList" class="flex-1 overflow-y-auto pr-2 space-y-3">
+                    <!-- Issues injected via JS -->
+                    <p class="text-gray-500 text-sm italic">Analysis pending...</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Section D: AI Recommendations -->
+        <div class="glass rounded-xl p-6 mb-8 border border-accent-purple/30">
+            <h3 class="text-lg font-semibold mb-4 text-white flex items-center gap-2">
+                <i class="fa-solid fa-wand-magic-sparkles text-accent-purple"></i>
+                AI Recommendations
+            </h3>
+            <div id="recommendationsGrid" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                <!-- Recommendations injected via JS -->
+            </div>
+        </div>
+
+    </main>
+
+    <!-- Settings Modal -->
+    <div id="settingsModal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[60] hidden flex items-center justify-center">
+        <div
+            class="glass p-6 rounded-xl w-full max-w-2xl border border-slate-700 shadow-2xl transform transition-all scale-100 max-h-[90vh] overflow-y-auto">
+            <h3 class="text-xl font-bold text-white mb-4 flex items-center gap-2">
+                <i class="fa-solid fa-database"></i> Data Source Manager
+            </h3>
+
+            <p class="text-xs text-gray-400 mb-6">Manage your data connections here. Data is saved locally in your
+                browser.</p>
+
+            <!-- Dynamic Data Rows -->
+            <div id="dataManagerRows" class="space-y-4 mb-6">
+                <!-- Rows injected via JS -->
+            </div>
+
+            <!-- Backup & Restore Section -->
+            <div class="border-t border-slate-700 pt-4 mb-4">
+                <h4 class="text-sm font-bold text-gray-300 mb-2">Backup & Restore</h4>
+                <div class="flex gap-3">
+                    <button onclick="exportDatabase()"
+                        class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm transition-colors border border-slate-600">
+                        <i class="fa-solid fa-download"></i> Export to JSON
+                    </button>
+                    <button onclick="document.getElementById('importFile').click()"
+                        class="flex-1 bg-slate-700 hover:bg-slate-600 text-white py-2 rounded text-sm transition-colors border border-slate-600">
+                        <i class="fa-solid fa-upload"></i> Import from JSON
+                    </button>
+                    <input type="file" id="importFile" class="hidden" accept=".json" onchange="importDatabase(this)">
+                </div>
+            </div>
+
+            <div class="mb-4 flex items-center gap-3">
+                <input type="checkbox" id="settingsCorsProxy"
+                    class="w-5 h-5 rounded border-slate-600 bg-slate-800 text-accent-blue focus:ring-accent-blue">
+                <label for="settingsCorsProxy" class="text-sm text-gray-300">Use CORS Proxy (Fix connection
+                    issues)</label>
+            </div>
+
+            <div class="flex justify-end gap-3 mt-6">
+                <button onclick="closeSettings()"
+                    class="px-4 py-2 rounded-lg text-gray-300 hover:bg-slate-700 transition-colors text-sm">Close</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- AI Analyst Modal -->
+    <div id="aiModal"
+        class="fixed inset-0 bg-slate-900/90 backdrop-blur-sm z-[70] hidden flex items-center justify-center">
+        <div class="glass p-6 rounded-xl w-full max-w-4xl border border-slate-700 shadow-2xl h-[85vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-robot text-accent-purple"></i> Gemini AI Analyst
+                </h3>
+                <button onclick="closeAIModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <!-- API Key Input (Only shows if not saved) -->
+            <div id="apiKeySection" class="mb-4 bg-slate-800 p-4 rounded-lg border border-slate-600 hidden">
+                <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Google Gemini API Key</label>
+                <div class="flex gap-2">
+                    <input type="password" id="geminiApiKey" placeholder="Paste your API Key here..."
+                        class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-sm text-white focus:border-accent-purple outline-none">
+                    <button onclick="saveApiKey()"
+                        class="bg-accent-purple hover:bg-purple-600 text-white px-4 py-2 rounded text-sm font-medium">
+                        Save Key
+                    </button>
+                </div>
+                <p class="text-[10px] text-gray-500 mt-2">Key is stored locally in your browser. Get one at <a
+                        href="https://aistudio.google.com/app/apikey" target="_blank"
+                        class="text-accent-blue hover:underline">Google AI Studio</a>.</p>
+            </div>
+
+            <!-- Chat/Result Area -->
+            <div id="aiResultArea"
+                class="flex-1 bg-slate-900/50 rounded-lg border border-slate-700 p-6 overflow-y-auto mb-4 font-mono text-sm text-gray-300 whitespace-pre-wrap">
+                <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                    <i class="fa-solid fa-wand-magic-sparkles text-4xl mb-4 opacity-50"></i>
+                    <p>Ready to analyze the current dashboard view.</p>
+                    <p class="text-xs mt-2">Selected Range: <span id="aiDateRange" class="text-gray-300">...</span></p>
+                    <button onclick="generateAIReport()"
+                        class="mt-6 bg-gradient-to-r from-accent-purple to-indigo-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                        Generate Insight Report
+                    </button>
+                </div>
+            </div>
+
+            <div class="flex justify-between items-center text-xs text-gray-500">
+                <span>Powered by Google Gemini</span>
+                <button onclick="clearApiKey()" class="hover:text-red-400">Reset API Key</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Reports Archive Modal -->
+    <div id="reportsArchiveModal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[80] hidden flex items-center justify-center">
+        <div class="glass p-6 rounded-xl w-full max-w-7xl border border-slate-700 shadow-2xl h-[90vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-archive text-accent-blue"></i> Gemini Reports Archive
+                </h3>
+                <button onclick="closeReportsArchive()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+            <div class="flex-1 grid grid-cols-3 gap-6 overflow-hidden">
+                <!-- Left Column: Timeline -->
+                <div id="reportsList" class="col-span-1 bg-slate-900/50 rounded-lg p-4 overflow-y-auto">
+                    <p class="text-gray-500 text-sm italic">No reports saved yet.</p>
+                </div>
+                <!-- Right Column: Report Detail -->
+                <div id="reportDetailView" class="col-span-2 bg-slate-800/50 rounded-lg p-6 overflow-y-auto">
+                    <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                        <i class="fa-regular fa-file-lines text-4xl mb-4 opacity-50"></i>
+                        <p>Select a report from the list to view its details.</p>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- N8N Modal -->
+    <div id="n8nModal"
+        class="fixed inset-0 bg-slate-900/80 backdrop-blur-sm z-[80] hidden flex items-center justify-center">
+        <div class="glass p-6 rounded-xl w-full max-w-5xl border border-slate-700 shadow-2xl h-[80vh] flex flex-col">
+            <div class="flex justify-between items-center mb-4 border-b border-slate-700 pb-4">
+                <h3 class="text-xl font-bold text-white flex items-center gap-2">
+                    <i class="fa-solid fa-bolt text-accent-yellow"></i> N8N Integration Center
+                </h3>
+                <button onclick="closeN8nModal()" class="text-gray-400 hover:text-white transition-colors">
+                    <i class="fa-solid fa-xmark text-xl"></i>
+                </button>
+            </div>
+
+            <div class="flex-1 grid grid-cols-1 lg:grid-cols-3 gap-6 overflow-hidden">
+
+                <!-- Left Column: Configuration -->
+                <div class="lg:col-span-1 flex flex-col gap-4 overflow-y-auto pr-2">
+
+                    <!-- Workflow Selector -->
+                    <div class="bg-slate-800/50 p-4 rounded-lg border border-slate-600">
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Select Workflow</label>
+                        <select id="n8nWorkflowSelect"
+                            class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm text-white focus:border-accent-yellow outline-none">
+                            <option value="fetch">Fetch Tickets (GET)</option>
+                            <option value="trigger">Generic Trigger (POST)</option>
+                        </select>
+                    </div>
+
+                    <!-- Dynamic Config Area -->
+                    <div id="n8nConfigArea">
+                        <!-- Injected by JS -->
+                    </div>
+
+                    <!-- Common Settings -->
+                    <div class="mt-auto pt-4 border-t border-slate-700">
+                        <label class="block text-xs font-bold text-gray-400 uppercase mb-2">Webhook URL</label>
+                        <input type="text" id="n8nWebhookUrl" placeholder="https://..."
+                            class="w-full bg-slate-900 border border-slate-600 rounded p-2 text-xs text-white focus:border-accent-yellow outline-none mb-4"
+                            value="https://adrien-revibe.app.n8n.cloud/webhook/13171d7f-6c8d-4164-90b0-379491d78008">
+
+                        <button id="n8nRunBtn"
+                            class="w-full bg-gradient-to-r from-accent-yellow to-orange-600 hover:from-yellow-500 hover:to-orange-700 text-white font-bold py-3 rounded-lg shadow-lg transition-all transform hover:scale-105">
+                            <i class="fa-solid fa-download"></i> Fetch Data
+                        </button>
+                    </div>
+                </div>
+
+                <!-- Right Column: Response -->
+                <div
+                    class="lg:col-span-2 flex flex-col bg-slate-900/50 rounded-lg border border-slate-700 overflow-hidden">
+                    <div class="bg-slate-800 px-4 py-2 flex justify-between items-center border-b border-slate-700">
+                        <span class="text-xs font-bold text-gray-400 uppercase">Execution Log & Response</span>
+                        <div id="n8nSaveOption" class="flex items-center gap-2">
+                            <input type="checkbox" id="n8nSaveToDbInput"
+                                class="rounded border-slate-600 bg-slate-700 text-accent-green focus:ring-accent-green">
+                            <label for="n8nSaveToDbInput" class="text-xs text-gray-300 cursor-pointer select-none">Save
+                                Response to DB</label>
+                        </div>
+                    </div>
+                    <pre id="n8nResponse"
+                        class="flex-1 p-4 text-xs font-mono text-green-400 overflow-auto whitespace-pre-wrap">Ready to execute workflow...</pre>
+                </div>
+
+            </div>
+        </div>
+    </div>
+
+    <!-- LOGIC SCRIPT -->
+    <script src="js/n8n.js"></script>
+    <script>
+        // ==========================================
+        // 🔧 CONFIGURATION
+        // ==========================================
+
+        // 🚨 REPLACE THIS WITH YOUR OPENSHEET URL
+        // Steps: 1. Share Google Sheet -> Anyone with link -> Viewer
+        //        2. Use format: https://opensheet.elk.sh/SPREADSHEET_ID/SHEET_NAME
+        const DATA_SOURCE_URL = 'https://opensheet.elk.sh/SPREADSHEET_ID/SHEET_NAME';
+
+        // Global Data Storage
+        let rawData = [];
+        let filteredData = [];
+        let charts = {}; // To store chart instances
+
+        // Database State
+        let database = {
+            'Master': { data: [], updated: 'Never', url: DATA_SOURCE_URL },
+            'KSA_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1b3IUeyvxEDitJmwpbx5lWHYVbQYS1eduEM3vt6T1qUU/sheet1' },
+            'UAE_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1oyLN9PdkdqO8Z30xxwg8MBId2btF-vtqu-TQPfxEPL4/sheet1' },
+            'ZA_Widget': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1GY-xV8yWixGz7w7U6zDic2Bh567lmj6YpIPtEbc9oEI/sheet1' },
+            'KSA_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1KxbGpcmUl1G6miFRE5QPKrACJ8E7Tfp0Yczm2VsE5VA/sheet1' },
+            'UAE_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1KAuZqbi6taOO600sc1bt3U3emWIwDBTl2mQXYiFPyqE/sheet1' },
+            'ZA_Whatsapp': { data: [], updated: 'Never', url: 'https://opensheet.elk.sh/1dhxifWyC0Bux3iY7zbU4tcUBj-fm4F9c1wbIRmE8E44/sheet1' }
+        };
+
+        // ==========================================
+        // 🗄️ INDEXED DB (Storage Fix)
+        // ==========================================
+        const IDB_NAME = 'CX_Dashboard_DB';
+        const IDB_VERSION = 2;
+        const IDB_STORE_REGIONS = 'regions';
+        const IDB_STORE_REPORTS = 'reports';
+
+        function initDB() {
+            return new Promise((resolve, reject) => {
+                const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+                request.onerror = () => reject(request.error);
+                request.onsuccess = () => resolve(request.result);
+                request.onupgradeneeded = (e) => {
+                    const db = e.target.result;
+                    if (!db.objectStoreNames.contains(IDB_STORE_REGIONS)) {
+                        db.createObjectStore(IDB_STORE_REGIONS, { keyPath: 'id' });
+                    }
+                    if (!db.objectStoreNames.contains(IDB_STORE_REPORTS)) {
+                        db.createObjectStore(IDB_STORE_REPORTS, { keyPath: 'id', autoIncrement: true });
+                    }
+                };
+            });
+        }
+
+        async function dbSaveRegion(regionKey, dataObj) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE_REGIONS, 'readwrite');
+                const store = tx.objectStore(IDB_STORE_REGIONS);
+                store.put({ id: regionKey, ...dataObj });
+                tx.oncomplete = () => resolve();
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function dbLoadAllRegionsRegions() {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE_REGIONS, 'readonly');
+                const store = tx.objectStore(IDB_STORE_REGIONS);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        async function dbSaveReport(reportData) {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE_REPORTS, 'readwrite');
+                const store = tx.objectStore(IDB_STORE_REPORTS);
+                const request = store.add(reportData);
+                tx.oncomplete = () => resolve(request.result);
+                tx.onerror = () => reject(tx.error);
+            });
+        }
+
+        async function dbLoadAllRegionsReports() {
+            const db = await initDB();
+            return new Promise((resolve, reject) => {
+                const tx = db.transaction(IDB_STORE_REPORTS, 'readonly');
+                const store = tx.objectStore(IDB_STORE_REPORTS);
+                const request = store.getAll();
+                request.onsuccess = () => resolve(request.result);
+                request.onerror = () => reject(request.error);
+            });
+        }
+
+        // ==========================================
+        // � INITIALIZATION
+        // ==========================================
+        window.onload = async function () {
+            // Load Database from IndexedDB
+            try {
+                const rows = await dbLoadAllRegionsRegions();
+                rows.forEach(row => {
+                    let key = row.id;
+                    // Migration: Map old region keys to Widget keys
+                    if (['KSA', 'UAE', 'ZA'].includes(key)) {
+                        key = key + '_Widget';
+                    }
+                    if (database[key]) {
+                        // Use saved URL if exists, otherwise keep default
+                        const savedUrl = row.url;
+                        const defaultUrl = database[key].url;
+
+                        database[key] = {
+                            data: row.data || [],
+                            updated: row.updated || 'Never',
+                            url: (savedUrl && savedUrl.trim() !== '') ? savedUrl : defaultUrl
+                        };
+                    }
+                });
+            } catch (e) {
+                console.error("Failed to load DB:", e);
+            }
+
+            // Set default dates (Last 30 days)
+            const today = new Date();
+            const last30 = new Date();
+            last30.setDate(today.getDate() - 30);
+
+            document.getElementById('endDate').valueAsDate = today;
+            document.getElementById('startDate').valueAsDate = last30;
+
+            // Update Last Sync Text based on most recent DB update
+            let latest = 'Never';
+            let maxTime = 0;
+            Object.values(database).forEach(entry => {
+                if (entry.updated && entry.updated !== 'Never') {
+                    const t = new Date(entry.updated).getTime();
+                    if (!isNaN(t) && t > maxTime) {
+                        maxTime = t;
+                        latest = entry.updated;
+                    }
+                }
+            });
+            document.getElementById('lastSyncText').innerText = `Last Sync: ${latest}`;
+
+            // Initial Load
+            applyFilters();
+
+            // Hide loader after initialization
+            document.getElementById('loader').classList.add('hidden');
+        };
+
+        // ==========================================
+        // 📥 DATA FETCHING
+        // ==========================================
+        async function fetchData(regionKey, showLoader = true) {
+            const loader = document.getElementById('loader');
+            if (showLoader) {
+                loader.classList.remove('hidden');
+            }
+
+            // Get URL from database state
+            const entry = database[regionKey];
+            const targetUrl = entry.url && entry.url.trim() !== '' ? entry.url : DATA_SOURCE_URL;
+
+            // Check for Proxy Setting
+            const useProxy = localStorage.getItem('cx_use_proxy') === 'true';
+
+            // Construct Final URL
+            const finalUrl = useProxy ? 'https://corsproxy.io/?' + encodeURIComponent(targetUrl) : targetUrl;
+            console.log("Attempting to fetch from:", finalUrl);
+
+            try {
+                const response = await fetch(finalUrl);
+                if (!response.ok) throw new Error(`HTTP error! status: ${response.status}`);
+
+                const textData = await response.text();
+                let jsonResponse = null;
+                let isJson = false;
+
+                // Try parsing as JSON first, regardless of Content-Type
+                try {
+                    jsonResponse = JSON.parse(textData);
+                    isJson = true;
+                } catch (e) {
+                    // Not JSON, proceed to CSV
+                }
+
+                if (isJson) {
+                    console.log("Received JSON response:", jsonResponse);
+
+                    // Smartly find the data array
+                    rawData = findDataArray(jsonResponse);
+
+                    // 🚨 DEBUG CHECK: If 200 OK but no data found, warn the user
+                    if (rawData.length === 0) {
+                        console.warn("JSON parsed but no array found. Root keys:", Object.keys(jsonResponse));
+                        alert(`Connected (200 OK), but could not find a data array.\n\nReceived:\n${JSON.stringify(jsonResponse, null, 2).slice(0, 200)}...`);
+                        if (showLoader) {
+                            loader.classList.add('hidden');
+                        }
+                        return;
+                    }
+
+                    // Inject Region Tag if provided (for consistency if merged later)
+                    if (regionKey !== 'Master') {
+                        rawData.forEach(row => row['Country'] = regionKey);
+                    }
+
+                    // ✅ Save to Database
+                    saveToDatabase(regionKey, rawData, showLoader);
+                }
+                // Handle CSV (Google Sheets fallback)
+                else {
+                    Papa.parse(textData, {
+                        header: true,
+                        skipEmptyLines: true,
+                        complete: function (results) {
+                            rawData = results.data;
+
+                            if (regionKey !== 'Master') {
+                                rawData.forEach(row => row['Country'] = regionKey);
+                            }
+
+                            // ✅ Save to Database
+                            saveToDatabase(regionKey, rawData, showLoader);
+                        }
+                    });
+                }
+            } catch (err) {
+                console.error("Error fetching data:", err);
+                alert("Fetch Failed: " + err.message);
+
+                if (err.message.includes('Failed to fetch') || err.name === 'TypeError') {
+                    alert("Connection Failed! This is likely a CORS error.\n\nTry enabling the 'Use CORS Proxy' option in Settings.");
+                } else if (err.message.includes('404')) {
+                    alert("Error 404: Not Found.\n\nPlease check if the URL is correct and the sheet is public.");
+                } else {
+                    alert(`Failed to load data: ${err.message}\n\nPlease check the browser console (F12) for more details.`);
+                }
+                if (showLoader) {
+                    loader.classList.add('hidden');
+                }
+            }
+        }
+
+        async function syncAll() {
+            const btn = document.getElementById('syncAllBtn');
+            const icon = btn.querySelector('i');
+            const textSpan = document.getElementById('lastSyncText');
+
+            // UI Loading State
+            btn.disabled = true;
+            icon.classList.add('fa-spin');
+            textSpan.innerText = "Syncing...";
+
+            const regions = [
+                'Master',
+                'KSA_Widget', 'UAE_Widget', 'ZA_Widget',
+                'KSA_Whatsapp', 'UAE_Whatsapp', 'ZA_Whatsapp'
+            ];
+
+            // Filter to only sync regions that have a valid, non-placeholder URL
+            const validRegions = regions.filter(r => {
+                const entry = database[r];
+                const url = entry.url && entry.url.trim() !== '' ? entry.url : DATA_SOURCE_URL;
+                return url && !url.includes('SPREADSHEET_ID');
+            });
+
+            try {
+                // Fetch valid regions in background (no full screen loader)
+                await Promise.all(validRegions.map(r => fetchData(r, false)));
+
+                // Update Timestamp
+                const now = new Date().toLocaleString();
+                textSpan.innerText = `Last Sync: ${now}`;
+            } catch (error) {
+                console.error("Sync All Failed", error);
+                textSpan.innerText = "Sync Failed";
+            } finally {
+                btn.disabled = false;
+                icon.classList.remove('fa-spin');
+            }
+        }
+
+        async function saveToDatabase(region, data, hideLoader = true) {
+            database[region].data = data;
+            database[region].updated = new Date().toLocaleString();
+
+            try {
+                await dbSaveRegion(region, database[region]);
+            } catch (e) {
+                console.error("DB Save Error:", e);
+                alert("Error saving to database: " + e.message);
+            }
+
+            // If we are currently viewing this region, refresh dashboard
+            // Check if the updated region matches the current filter criteria
+            const currentView = document.getElementById('countryFilter').value;
+            const currentSource = document.getElementById('sourceFilter').value;
+
+            const viewKey = currentView === 'All' ? 'Master' : `${currentView}_${currentSource}`;
+
+            if (viewKey === region || currentView === 'All') {
+                applyFilters();
+            }
+
+            // If settings are open, refresh them
+            if (!document.getElementById('settingsModal').classList.contains('hidden')) {
+                renderSettingsRows();
+            }
+
+            if (hideLoader) {
+                document.getElementById('loader').classList.add('hidden');
+            }
+        }
+
+        async function updateRegionUrl(region, newUrl) {
+            database[region].url = newUrl;
+            try {
+                await dbSaveRegion(region, database[region]);
+                alert('URL for ' + region + ' saved!'); // Give user feedback
+            } catch (e) {
+                console.error("Failed to save URL:", e);
+                alert('Failed to save URL: ' + e.message);
+            }
+        }
+
+        async function testRegionUrl(regionKey) {
+            const urlInput = document.getElementById('url_' + regionKey);
+            const targetUrl = urlInput.value.trim();
+
+            if (!targetUrl) {
+                alert("URL is empty.");
+                return;
+            }
+
+            const useProxy = localStorage.getItem('cx_use_proxy') === 'true';
+            const finalUrl = useProxy ? 'https://corsproxy.io/?' + encodeURIComponent(targetUrl) : targetUrl;
+
+            alert(`Testing connection to: ${finalUrl}`);
+
+            try {
+                const response = await fetch(finalUrl);
+                if (!response.ok) {
+                    throw new Error(`HTTP error! Status: ${response.status}`);
+                }
+                alert(`Connection successful! The API returned status ${response.status}.`);
+            } catch (err) {
+                console.error("Test connection failed:", err);
+                alert(`Connection failed: ${err.message}`);
+            }
+        }
+
+        // Helper to find the data array in various JSON structures
+        function findDataArray(obj) {
+            if (Array.isArray(obj)) {
+                // Direct array: [{...}, {...}]
+                return obj;
+            }
+
+            // 4. Wrapped object: { data: [...] } or { items: [...] }
+            if (obj && typeof obj === 'object') {
+                if (Array.isArray(obj.data)) return obj.data;
+                if (Array.isArray(obj.items)) return obj.items;
+                if (Array.isArray(obj.result)) return obj.result;
+                // 5. Fallback: Return first array property found
+                for (const key in obj) {
+                    if (Array.isArray(obj[key])) return obj[key];
+                }
+            }
+            return [];
+        }
+
+        // ==========================================
+        // 🔍 FILTER LOGIC
+        // ==========================================
+        function applyFilters() {
+            const countryVal = document.getElementById('countryFilter').value;
+
+            const sourceVal = document.getElementById('sourceFilter').value;
+            const startVal = new Date(document.getElementById('startDate').value);
+            const endVal = new Date(document.getElementById('endDate').value);
+            // End date needs to cover the full day, so set to end of day
+            endVal.setHours(23, 59, 59, 999);
+
+            const isCompare = document.getElementById('compareToggle').checked;
+
+            // Determine which DB key to use
+            if (countryVal === 'All') {
+                // Merge all data
+
+                rawData = [];
+                if (sourceVal == "Widget") {
+                    rawData = rawData.concat(database.Master.data);
+                    rawData = rawData.concat(database.KSA_Widget.data);
+                    rawData = rawData.concat(database.UAE_Widget.data);
+                    rawData = rawData.concat(database.ZA_Widget.data);
+
+                } else if (sourceVal == "Whatsapp") {
+                    rawData = rawData.concat(
+                        ...database.KSA_Whatsapp.data,
+                        ...database.UAE_Whatsapp.data,
+                        ...database.ZA_Whatsapp.data
+                    );
+                }
+                document.getElementById('dataStatusText').innerText = `Merged View (${rawData.length} rows)`;
+                document.getElementById('dataStatusText').className = "text-xs text-accent-blue text-center";
+            } else {
+                // Specific Region
+                const key = `${countryVal}_${sourceVal}`;
+                const entry = database[key];
+
+                rawData = entry ? entry.data : [];
+                const updated = entry ? entry.updated : 'Never';
+                document.getElementById('dataStatusText').innerText = `Loaded: ${countryVal} ${sourceVal} (${updated})`;
+                document.getElementById('dataStatusText').className = "text-xs text-accent-green text-center";
+            }
+
+            console.log("Raw Data Loaded:", rawData.length, "rows");
+
+            // 1. Main Filter
+            filteredData = rawData.filter(row => {
+                // Determine row Date (Handle multiple date formats loosely)
+                const rowDateStr = row['First message date'] || row['first_message_date'] || '';
+                const rowDate = new Date(rowDateStr);
+
+                // Determine Country (Assuming 'Region' or inferring from filename if mapped in sheet)
+                // Note: If you don't have a 'Country' column in your specific CSV, 
+                // you might need to add one or rely on separate sheets. 
+                // For this demo, we'll assume ALL data is present or handle filtering if column exists.
+                // If your sheet combines countries, ensure there's a 'Country' or 'Region' column.
+                const rowCountry = row['Country'] || 'All';
+
+                // Date Check
+                const dateValid = rowDate >= startVal && rowDate <= endVal;
+
+                // Country Check (Only if column exists, otherwise ignore)
+                const countryValid = (countryVal === 'All') ? true : (rowCountry === countryVal || rowCountry.startsWith(countryVal));
+
+                return dateValid && countryValid;
+            });
+
+            console.log("Filtered Data:", filteredData.length);
+
+            // 2. Previous Period Data (For Comparison)
+            let prevData = [];
+            if (isCompare) {
+                const dayDiff = (endVal - startVal) / (1000 * 60 * 60 * 24);
+                const prevStart = new Date(startVal);
+                prevStart.setDate(prevStart.getDate() - dayDiff);
+                const prevEnd = new Date(startVal);
+
+                prevData = rawData.filter(row => {
+                    const rDate = new Date(row['First message date']);
+                    return rDate >= prevStart && rDate < prevEnd;
+                });
+            }
+
+            updateKPIs(filteredData, prevData, isCompare);
+            updateCharts(filteredData);
+            updateAnalysis(filteredData);
+        }
+
+        // ==========================================
+        // 📊 VISUALIZATION UPDATE
+        // ==========================================
+        function updateKPIs(data, prevData, isCompare) {
+            const total = data.length;
+            const prevTotal = prevData.length;
+
+            // 1. Total Volume
+            const kpiVol = document.getElementById('kpiTotalVolume');
+            const kpiTrend = document.getElementById('trendVolume');
+
+            kpiVol.innerText = total.toLocaleString();
+
+            if (isCompare && prevTotal > 0) {
+                const diff = total - prevTotal;
+                const pct = ((diff / prevTotal) * 100).toFixed(1);
+                const color = diff >= 0 ? 'text-accent-green' : 'text-accent-red';
+                const icon = diff >= 0 ? '↑' : '↓';
+                kpiTrend.innerHTML = `<span class="${color}">${icon} ${Math.abs(pct)}%</span> vs previous period`;
+            } else {
+                kpiTrend.innerHTML = `<span class="text-gray-500">Select comparison to see trends</span>`;
+            }
+
+            // 2. Escalation Rate
+            const escalated = data.filter(r => (r['Requested Agent'] || '').toLowerCase() === 'yes').length;
+            const escRate = total > 0 ? ((escalated / total) * 100).toFixed(1) + '%' : '0%';
+            document.getElementById('kpiEscalation').innerText = escRate;
+
+            // 3. Sentiment
+            const positive = data.filter(r => (r['Sentiment'] || '').toLowerCase() === 'positive').length;
+            const negative = data.filter(r => (r['Sentiment'] || '').toLowerCase() === 'negative').length;
+            const neutral = total - positive - negative;
+
+            if (total > 0) {
+                const pPct = ((positive / total) * 100).toFixed(0) + '%';
+                const nPct = ((negative / total) * 100).toFixed(0) + '%';
+                const uPct = ((neutral / total) * 100).toFixed(0) + '%';
+
+                document.getElementById('barPositive').style.width = pPct;
+                document.getElementById('barNegative').style.width = nPct;
+                document.getElementById('barNeutral').style.width = uPct;
+
+                document.getElementById('valPositive').innerText = pPct;
+                document.getElementById('valNegative').innerText = nPct;
+                document.getElementById('valNeutral').innerText = uPct;
+            } else {
+                document.getElementById('barPositive').style.width = '0%';
+                document.getElementById('barNegative').style.width = '0%';
+                document.getElementById('barNeutral').style.width = '0%';
+            }
+
+            // 4. Avg Bot Messages
+            let msgSum = 0;
+            let countWithMsg = 0;
+            data.forEach(r => {
+                const msgs = parseInt(r['alhena_msgs']);
+                if (!isNaN(msgs)) {
+                    msgSum += msgs;
+                    countWithMsg++;
+                }
+            });
+            const avg = countWithMsg > 0 ? (msgSum / countWithMsg).toFixed(1) : '-';
+            document.getElementById('kpiAvgMsgs').innerText = avg;
+        }
+
+        function updateCharts(data) {
+            // Helper: Group By Date
+            const volByDate = {};
+            data.forEach(r => {
+                const dStr = r['First message date']; // Format: 2025-11-26 14:19:58
+                if (dStr) {
+                    const shortDate = dStr.split(' ')[0]; // 2025-11-26
+                    volByDate[shortDate] = (volByDate[shortDate] || 0) + 1;
+                }
+            });
+
+            // Sort Dates
+            const sortedDates = Object.keys(volByDate).sort();
+            const volData = sortedDates.map(d => volByDate[d]);
+
+            // Helper: Group by Category
+            const catCounts = {};
+            data.forEach(r => {
+                const c = r['Primary Category'] || 'Uncategorized';
+                catCounts[c] = (catCounts[c] || 0) + 1;
+            });
+
+            // Helper: Group by Intent
+            const intentCounts = {};
+            data.forEach(r => {
+                const i = r['Intent'] || 'Unknown';
+                intentCounts[i] = (intentCounts[i] || 0) + 1;
+            });
+            // Sort intents and take top 5
+            const sortedIntents = Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+            // --- RENDER CHARTS ---
+            destroyChart('volumeChart');
+            destroyChart('categoryChart');
+            destroyChart('intentChart');
+
+            // 1. Line Chart
+            const ctx1 = document.getElementById('volumeChart').getContext('2d');
+            charts['volumeChart'] = new Chart(ctx1, {
+                type: 'line',
+                data: {
+                    labels: sortedDates,
+                    datasets: [{
+                        label: 'Tickets',
+                        data: volData,
+                        borderColor: '#3b82f6',
+                        backgroundColor: 'rgba(59, 130, 246, 0.2)',
+                        borderWidth: 2,
+                        fill: true,
+                        tension: 0.4
+                    }]
+                },
+                options: getChartOptions('line')
+            });
+
+            // 2. Category Doughnut
+            const ctx2 = document.getElementById('categoryChart').getContext('2d');
+            charts['categoryChart'] = new Chart(ctx2, {
+                type: 'doughnut',
+                data: {
+                    labels: Object.keys(catCounts),
+                    datasets: [{
+                        data: Object.values(catCounts),
+                        backgroundColor: ['#3b82f6', '#8b5cf6', '#ef4444', '#10b981', '#f59e0b'],
+                        borderWidth: 0
+                    }]
+                },
+                options: getChartOptions('doughnut')
+            });
+
+            // 3. Top Intents Horizontal Bar
+            const ctx3 = document.getElementById('intentChart').getContext('2d');
+            charts['intentChart'] = new Chart(ctx3, {
+                type: 'bar',
+                data: {
+                    labels: sortedIntents.map(x => x[0]),
+                    datasets: [{
+                        label: 'Count',
+                        data: sortedIntents.map(x => x[1]),
+                        backgroundColor: '#f59e0b',
+                        borderRadius: 4
+                    }]
+                },
+                options: {
+                    indexAxis: 'y',
+                    ...getChartOptions('bar')
+                }
+            });
+        }
+
+        function updateAnalysis(data) {
+            // 1. Top Recurring Negative Reasons
+            const negativeTickets = data.filter(r => (r['Sentiment'] || '').toLowerCase() === 'negative');
+            const issuesMap = {};
+
+            negativeTickets.forEach(r => {
+                const reason = r['Reason'];
+                if (reason && reason !== 'null' && reason !== 'empty') {
+                    // Simple cleaning to group vaguely similar texts (in a real app, AI grouping is better)
+                    // For now, we assume AI Normalized the 'Reason' output somewhat consistently
+                    issuesMap[reason] = (issuesMap[reason] || 0) + 1;
+                }
+            });
+
+            const sortedIssues = Object.entries(issuesMap).sort((a, b) => b[1] - a[1]).slice(0, 5);
+
+            const issuesContainer = document.getElementById('issuesList');
+            issuesContainer.innerHTML = ''; // Clear previous
+
+            if (sortedIssues.length === 0) {
+                issuesContainer.innerHTML = '<p class="text-gray-500 text-sm">No significant negative issues found in this selection.</p>';
+            } else {
+                sortedIssues.forEach(([issue, count]) => {
+                    const html = `
+                        <div class="bg-slate-800/50 p-3 rounded-lg border border-slate-700 flex justify-between items-start">
+                            <p class="text-sm text-gray-200">${issue}</p>
+                            <span class="text-xs font-bold bg-accent-red/20 text-accent-red px-2 py-1 rounded ml-2">${count}</span>
+                        </div>
+                    `;
+                    issuesContainer.insertAdjacentHTML('beforeend', html);
+                });
+            }
+
+            // 2. Actionable Recommendations
+            const recMap = {};
+            negativeTickets.forEach(r => {
+                const rec = r['Recommendation'];
+                if (rec && rec !== 'null' && rec !== 'empty') {
+                    recMap[rec] = (recMap[rec] || 0) + 1;
+                }
+            });
+            const topRecs = Object.entries(recMap).sort((a, b) => b[1] - a[1]).slice(0, 3);
+
+            const recContainer = document.getElementById('recommendationsGrid');
+            recContainer.innerHTML = '';
+
+            const iconMap = {
+                'Priority Agent Callback': 'fa-phone-volume',
+                'Logistics Investigation': 'fa-truck-fast',
+                'Initiate Return/Exchange': 'fa-rotate',
+                'Offer Discount Voucher': 'fa-ticket'
+            };
+
+            topRecs.forEach(([rec, count]) => {
+                const icon = iconMap[rec] || 'fa-clipboard-check';
+                const html = `
+                    <div class="bg-gradient-to-br from-slate-800 to-slate-900 p-4 rounded-lg border border-slate-700 text-center">
+                        <div class="w-10 h-10 bg-slate-700 rounded-full flex items-center justify-center mx-auto mb-3 text-accent-purple">
+                            <i class="fa-solid ${icon}"></i>
+                        </div>
+                        <h4 class="text-sm font-bold text-gray-200 mb-1">${rec}</h4>
+                        <p class="text-xs text-gray-500">Suggested ${count} times</p>
+                    </div>
+                `;
+                recContainer.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        // ==========================================
+        // 🛠️ CHART UTILS
+        // ==========================================
+        function getChartOptions(type) {
+            const base = {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: {
+                        position: 'bottom',
+                        labels: { color: '#94a3b8', font: { size: 10 } }
+                    }
+                },
+                scales: {
+                    x: { ticks: { color: '#64748b' }, grid: { display: false } },
+                    y: { ticks: { color: '#64748b' }, grid: { color: '#334155' }, beginAtZero: true }
+                }
+            };
+
+            if (type === 'doughnut') {
+                delete base.scales;
+            }
+            return base;
+        }
+
+        function destroyChart(id) {
+            if (charts[id]) {
+                charts[id].destroy();
+            }
+        }
+
+        // ==========================================
+        // ⚙️ SETTINGS LOGIC
+        // ==========================================
+        function openSettings() {
+            const modal = document.getElementById('settingsModal');
+            const proxyCheck = document.getElementById('settingsCorsProxy');
+            proxyCheck.checked = localStorage.getItem('cx_use_proxy') === 'true';
+
+            renderSettingsRows();
+            modal.classList.remove('hidden');
+        }
+
+        function renderSettingsRows() {
+            const container = document.getElementById('dataManagerRows');
+            container.innerHTML = '';
+
+            const regions = [
+                { code: 'Master', label: 'Global / Master (Widget Only)', keys: ['Master'] },
+                { code: 'KSA', label: 'Saudi Arabia (KSA)', keys: ['KSA_Widget', 'KSA_Whatsapp'] },
+                { code: 'UAE', label: 'UAE', keys: ['UAE_Widget', 'UAE_Whatsapp'] },
+                { code: 'ZA', label: 'South Africa (ZA)', keys: ['ZA_Widget', 'ZA_Whatsapp'] }
+            ];
+
+            regions.forEach(reg => {
+                let rowsHtml = '';
+
+                reg.keys.forEach(key => {
+                    const dbEntry = database[key];
+                    const count = dbEntry.data.length;
+                    const lastUpd = dbEntry.updated;
+                    const currentUrl = dbEntry.url;
+                    const statusColor = count > 0 ? 'text-accent-green' : 'text-gray-500';
+                    const label = key.includes('_Whatsapp') ? 'Whatsapp' : (key === 'Master' ? 'Master Sheet' : 'Chat Widget');
+
+                    rowsHtml += `
+                        <div class="flex gap-2 items-center mt-2 first:mt-0">
+                            <span class="text-xs text-gray-400 w-20">${label}</span>
+                            <input type="text" id="url_${key}" value="${currentUrl}" placeholder="https://..." 
+                                class="flex-1 bg-slate-900 border border-slate-600 rounded px-3 py-2 text-xs text-white focus:border-accent-blue outline-none">
+                            
+                            <button onclick="testRegionUrl('${key}')" 
+                                class="bg-gray-600 hover:bg-gray-700 text-white px-3 py-1 rounded text-xs font-medium transition-colors" title="Test Connection">
+                                <i class="fa-solid fa-flask"></i>
+                            </button>
+                            <button onclick="updateRegionUrl('${key}', document.getElementById('url_${key}').value)"
+                                class="bg-accent-green hover:bg-green-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors" title="Save URL">
+                                <i class="fa-solid fa-save"></i>
+                            </button>
+                            <button onclick="fetchData('${key}')" 
+                                class="bg-accent-blue hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium transition-colors" title="Sync Data">
+                                <i class="fa-solid fa-rotate"></i>
+                            </button>
+                            <span class="text-[10px] ${statusColor} w-24 text-right">${count} Rows<br>${lastUpd.split(',')[0]}</span>
+                        </div>
+                    `;
+                });
+
+                const html = `
+                    <div class="p-4 bg-slate-800/50 rounded-lg border border-slate-600">
+                        <div class="flex justify-between items-center mb-2">
+                            <h4 class="font-bold text-sm text-white">${reg.label}</h4>
+                        </div>
+                        ${rowsHtml}
+                    </div>
+                `;
+                container.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        function closeSettings() {
+            // Save proxy setting
+            const proxyCheck = document.getElementById('settingsCorsProxy');
+            localStorage.setItem('cx_use_proxy', proxyCheck.checked);
+            document.getElementById('settingsModal').classList.add('hidden');
+        }
+
+        // ==========================================
+        // 📂 REPORTS ARCHIVE LOGIC
+        // ==========================================
+        let savedReports = [];
+
+        async function openReportsArchive() {
+            try {
+                savedReports = await dbLoadAllRegionsReports();
+                renderReportsList();
+                document.getElementById('reportsArchiveModal').classList.remove('hidden');
+            } catch (e) {
+                console.error("Could not open reports archive:", e);
+                alert("Error loading reports: " + e.message);
+            }
+        }
+
+        function closeReportsArchive() {
+            document.getElementById('reportsArchiveModal').classList.add('hidden');
+        }
+
+        function renderReportsList() {
+            const listEl = document.getElementById('reportsList');
+            listEl.innerHTML = ''; // Clear existing list
+
+            if (!savedReports || savedReports.length === 0) {
+                listEl.innerHTML = '<p class="text-gray-500 text-sm italic">No reports saved yet.</p>';
+                return;
+            }
+
+            // Sort reports, newest first
+            const sorted = savedReports.sort((a, b) => b.savedAt - a.savedAt);
+
+            sorted.forEach(report => {
+                const title = `Analysis for ${report.context.region}`;
+                const date = new Date(report.savedAt).toLocaleString();
+                const html = `
+                    <div onclick="displayReport(${report.id})" class="p-3 rounded-lg hover:bg-slate-700 cursor-pointer border-b border-slate-800">
+                        <p class="font-bold text-sm text-white">${title}</p>
+                        <p class="text-xs text-gray-400">${date}</p>
+                    </div>
+                `;
+                listEl.insertAdjacentHTML('beforeend', html);
+            });
+        }
+
+        function displayReport(reportId) {
+            const detailView = document.getElementById('reportDetailView');
+            const report = savedReports.find(r => r.id === reportId);
+
+            if (!report) {
+                detailView.innerHTML = '<p class="text-accent-red">Report not found.</p>';
+                return;
+            }
+
+            const context = report.context;
+            const title = `Report for ${context.region} (${context.dateRange.start} to ${context.dateRange.end})`;
+
+            const html = `
+                <div class="prose prose-invert max-w-none">
+                    <div class="flex justify-between items-center mb-4">
+                         <h2 class="text-lg font-bold text-white">${title}</h2>
+                         <button onclick="deleteReport(${report.id})" class="text-gray-400 hover:text-accent-red transition-colors text-xs py-1 px-2 rounded hover:bg-slate-700">
+                            <i class="fa-solid fa-trash"></i> Delete
+                         </button>
+                    </div>
+                    <p class="text-xs text-gray-500">Saved on ${new Date(report.savedAt).toLocaleString()}</p>
+                    <hr class="border-slate-600 my-4"/>
+                    ${report.htmlContent}
+                </div>
+            `;
+            detailView.innerHTML = html;
+        }
+
+        async function deleteReport(reportId) {
+            if (!confirm("Are you sure you want to delete this report forever?")) {
+                return;
+            }
+
+            try {
+                const db = await initDB();
+                await new Promise((resolve, reject) => {
+                    const tx = db.transaction(IDB_STORE_REPORTS, 'readwrite');
+                    const store = tx.objectStore(IDB_STORE_REPORTS);
+                    store.delete(reportId);
+                    tx.oncomplete = () => resolve();
+                    tx.onerror = () => reject(tx.error);
+                });
+
+                // Refresh the view
+                document.getElementById('reportDetailView').innerHTML = '<p class="text-gray-500">Report deleted.</p>';
+                await openReportsArchive(); // Reload and render list
+
+            } catch (e) {
+                console.error("Failed to delete report:", e);
+                alert("Error deleting report: " + e.message);
+            }
+        }
+
+        // ==========================================
+        // 🤖 AI ANALYST LOGIC
+        // ==========================================
+        let aiLogContent = '';
+
+        function aiLog(message, data = null) {
+            const timestamp = new Date().toLocaleTimeString();
+            const logMessage = `[${timestamp}] ${message}`;
+
+            aiLogContent += logMessage + '\n';
+            if (data) {
+                // Pretty print JSON for readability in the log
+                const formattedData = JSON.stringify(data, null, 2);
+                aiLogContent += formattedData + '\n';
+                console.log(logMessage, data);
+            } else {
+                console.log(logMessage);
+            }
+
+            const logArea = document.getElementById('aiLogArea');
+            if (logArea) {
+                logArea.textContent = aiLogContent;
+                // Scroll to the bottom of the log
+                logArea.scrollTop = logArea.scrollHeight;
+            }
+        }
+
+        function groupAndCount(data, key) {
+            if (!key) return {};
+            return data.reduce((acc, row) => {
+                const value = row[key] || 'Unspecified';
+                acc[value] = (acc[value] || 0) + 1;
+                return acc;
+            }, {});
+        }
+
+        function openAIModal() {
+            const modal = document.getElementById('aiModal');
+            const keySection = document.getElementById('apiKeySection');
+            const resultArea = document.getElementById('aiResultArea');
+            const savedKey = localStorage.getItem('cx_gemini_key');
+
+            // Reset UI
+            resultArea.innerHTML = `
+                <div class="flex flex-col items-center justify-center h-full text-gray-500">
+                    <i class="fa-solid fa-wand-magic-sparkles text-4xl mb-4 opacity-50"></i>
+                    <p>Ready to analyze the current dashboard view.</p>
+                    <p class="text-xs mt-2">Selected Range: <span id="aiDateRange" class="text-gray-300">...</span></p>
+                    <button onclick="generateAIReport()"
+                        class="mt-6 bg-gradient-to-r from-accent-purple to-indigo-600 text-white px-6 py-3 rounded-full font-bold shadow-lg hover:scale-105 transition-transform">
+                        Generate Insight Report
+                    </button>
+                </div>
+            `;
+
+
+            // Update Date Range Text
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+            const region = document.getElementById('countryFilter').value;
+            document.getElementById('aiDateRange').innerText = `${region} (${start} to ${end})`;
+
+            if (!savedKey) {
+                keySection.classList.remove('hidden');
+            } else {
+                keySection.classList.add('hidden');
+            }
+
+            modal.classList.remove('hidden');
+        }
+
+        function closeAIModal() {
+            document.getElementById('aiModal').classList.add('hidden');
+        }
+
+        function saveApiKey() {
+            const key = document.getElementById('geminiApiKey').value.trim();
+            if (key) {
+                localStorage.setItem('cx_gemini_key', key);
+                document.getElementById('apiKeySection').classList.add('hidden');
+                alert("API Key Saved!");
+            }
+        }
+
+        function clearApiKey() {
+            localStorage.removeItem('cx_gemini_key');
+            document.getElementById('apiKeySection').classList.remove('hidden');
+            document.getElementById('geminiApiKey').value = '';
+        }
+
+        async function generateAIReport() {
+            const apiKey = localStorage.getItem('cx_gemini_key');
+            if (!apiKey) {
+                alert("Please enter your Gemini API Key first.");
+                document.getElementById('apiKeySection').classList.remove('hidden');
+                return;
+            }
+
+            // Reset state
+            currentReport = { html: '', text: '' };
+            currentAggregatedData = {};
+            const resultArea = document.getElementById('aiResultArea');
+
+            // Setup logging UI
+            aiLogContent = ''; // Reset log
+            resultArea.innerHTML = `
+                <div class="h-full flex flex-col">
+                    <div id="aiFinalReport" class="flex-1 overflow-y-auto">
+                         <div class="flex flex-col items-center justify-center h-full">
+                            <div class="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-accent-purple mb-4"></div>
+                            <p class="text-accent-purple animate-pulse">AI analysis in progress...</p>
+                        </div>
+                    </div>
+                    <div id="aiReportActions" class="flex justify-end gap-2 mt-2 pt-2 border-t border-slate-700"></div>
+                    <div class="mt-2 border-t border-slate-600 pt-2">
+                        <h4 class="text-xs font-bold text-gray-400 uppercase mb-2">Analysis Log</h4>
+                        <pre id="aiLogArea" class="text-xs text-gray-500 bg-slate-900 p-2 rounded h-24 overflow-y-auto"></pre>
+                    </div>
+                </div>
+            `;
+
+            try {
+                aiLog("Booting up AI Analyst...");
+                aiLog(`Analyzing ${filteredData.length} tickets.`);
+
+                // 1. Aggregate Data
+                aiLog("Aggregating and summarizing ticket data...");
+                const categorySummary = groupAndCount(filteredData, 'Primary Category');
+                const intentSummary = groupAndCount(filteredData, 'Intent');
+                const negativeTickets = filteredData.filter(r => (r['Sentiment'] || '').toLowerCase() === 'negative');
+                const negativeReasonsSummary = groupAndCount(negativeTickets, 'Reason');
+                aiLog("Data summarization complete.");
+
+                currentAggregatedData = {
+                    totalTickets: filteredData.length,
+                    ticketsByCategory: categorySummary,
+                    ticketsByIntent: intentSummary,
+                    totalNegativeTickets: negativeTickets.length,
+                    reasonsForNegativeSentiment: negativeReasonsSummary
+                };
+
+                // 2. Construct Prompt
+                aiLog("Constructing expanded prompt for Gemini...");
+                const prompt = `
+                    You are a world-class Senior Customer Experience (CX) Analyst, known for your sharp insights and clear, actionable reports.
+                    Analyze the following summary of customer support tickets for a comprehensive report.
+
+                    CONTEXT:
+                    - Report for Region: ${document.getElementById('countryFilter').value}
+                    - Date Range: ${document.getElementById('startDate').value} to ${document.getElementById('endDate').value}
+
+                    AGGREGATED DATA (JSON):
+                    ${JSON.stringify(currentAggregatedData, null, 2)}
+
+                    TASK:
+                    Generate a detailed, well-structured report in Markdown format. The report must include the following sections:
+
+                    1.  **Overall CX Health Score**: Provide a single score from 1-100 (1=critical, 100=excellent) representing the overall customer experience health in this period. Justify the score in one sentence.
+                    
+                    2.  **Executive Summary**: A brief, high-level paragraph summarizing the key findings. What is the main story this data tells?
+
+                    3.  **Key Metrics Snapshot**: Present a Markdown table of the most critical metrics from the data.
+                        | Metric                        | Value |
+                        | ----------------------------- | ----- |
+                        | Total Tickets                 | ...   |
+                        | Total Negative Tickets        | ...   |
+                        | Negative Ticket %             | ...   |
+                        | Top Contact Category & Count  | ...   |
+                        | Top Contact Intent & Count    | ...   |
+
+                    4.  **Deep Dive: Top 3 Drivers of Negative CX**:
+                        - Identify the top 3 reasons for negative sentiment from the 'reasonsForNegativeSentiment' data.
+                        - For each reason, provide a brief analysis. What is the likely customer impact? Why is this happening?
+                        - Use bullet points for clarity.
+
+                    5.  **Strategic & Actionable Recommendations**:
+                        - Based *only* on the analysis of negative drivers, provide 3 strategic, actionable recommendations.
+                        - For each recommendation, specify the expected outcome (e.g., "Reduce 'defective item' complaints by X%").
+                        - Format as a numbered list.
+                `;
+                aiLog("Prompt construction complete. Sending to API.");
+
+                // 3. Call API
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1alpha/models/gemini-3-pro-preview:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        contents: [{ parts: [{ text: prompt }] }],
+                        generationConfig: {
+                            thinkingConfig: {
+                                thinkingLevel: "low"
+                            }
+                        }
+                    })
+                });
+
+                const json = await response.json();
+
+                if (json.error || !response.ok) {
+                    throw new Error(json.error?.message || `HTTP Error: ${response.status}`);
+                }
+
+                aiLog("Received valid response from Gemini.");
+
+                const rawText = json.candidates[0].content.parts[0].text;
+
+                // Simple Markdown Formatting for display
+                const formattedText = rawText
+                    .replace(/\*\*(.*?)\*\*/g, '<strong class="text-white">$1</strong>')
+                    .replace(/^# (.*$)/gm, '<h1 class="text-xl font-bold text-accent-purple mt-4 mb-2">$1</h1>')
+                    .replace(/^## (.*$)/gm, '<h2 class="text-lg font-bold text-white mt-3 mb-2">$1</h2>')
+                    .replace(/^### (.*$)/gm, '<h3 class="text-md font-semibold text-gray-200 mt-2 mb-1">$1</h3>')
+                    .replace(/^\* (.*$)/gm, '<li class="ml-4 list-disc">$1</li>')
+                    .replace(/\|/g, ' | ') // Add spacing to tables for better rendering
+                    .replace(/---/g, '---');
+
+                const reportContainer = document.getElementById('aiFinalReport');
+                reportContainer.innerHTML = `<div class="prose prose-invert max-w-none">${formattedText}</div>`;
+
+                // Store for saving/copying
+                currentReport.html = reportContainer.innerHTML;
+                currentReport.text = reportContainer.innerText;
+
+                aiLog("Report generated successfully!");
+
+                // Add action buttons
+                const actionsContainer = document.getElementById('aiReportActions');
+                actionsContainer.innerHTML = `
+                    <button onclick="copyReport()" class="bg-slate-600 hover:bg-slate-700 text-white px-3 py-1 rounded text-xs font-medium">
+                        <i class="fa-solid fa-copy"></i> Copy Report
+                    </button>
+                    <button onclick="saveReport()" class="bg-accent-blue hover:bg-blue-600 text-white px-3 py-1 rounded text-xs font-medium">
+                        <i class="fa-solid fa-save"></i> Save Report
+                    </button>
+                `;
+
+            } catch (err) {
+                console.error(err);
+                aiLog(`Analysis Failed: ${err.message}`);
+                document.getElementById('aiFinalReport').innerHTML = `<div class="text-accent-red p-4 border border-accent-red/30 rounded bg-accent-red/10">
+                    <strong>Analysis Failed:</strong> ${err.message}
+                </div>`;
+            }
+        }
+
+        function copyReport() {
+            if (!currentReport.text) {
+                alert("No report to copy.");
+                return;
+            }
+            navigator.clipboard.writeText(currentReport.text).then(() => {
+                alert("Report copied to clipboard!");
+            }, (err) => {
+                alert("Failed to copy report: " + err);
+            });
+        }
+
+        async function saveReport() {
+            if (!currentReport.html) {
+                alert("No report to save.");
+                return;
+            }
+
+            const reportData = {
+                htmlContent: currentReport.html,
+                textContent: currentReport.text,
+                context: {
+                    region: document.getElementById('countryFilter').value,
+                    dateRange: {
+                        start: document.getElementById('startDate').value,
+                        end: document.getElementById('endDate').value,
+                    }
+                },
+                aggregatedData: currentAggregatedData,
+                savedAt: Date.now()
+            };
+
+            try {
+                const newId = await dbSaveReport(reportData);
+                alert(`Report saved successfully with ID: ${newId}`);
+            } catch (e) {
+                console.error("Failed to save report:", e);
+                alert("Error saving report: " + e.message);
+            }
+        }
+
+        // ==========================================
+        // 💾 BACKUP & RESTORE LOGIC
+        // ==========================================
+        async function exportDatabase() {
+            try {
+                const db = await initDB();
+                const tx = db.transaction([IDB_STORE_REGIONS, IDB_STORE_REPORTS], 'readonly');
+
+                // Get all data
+                const regions = await new Promise(resolve => {
+                    tx.objectStore(IDB_STORE_REGIONS).getAll().onsuccess = (e) => resolve(e.target.result);
+                });
+                const reports = await new Promise(resolve => {
+                    tx.objectStore(IDB_STORE_REPORTS).getAll().onsuccess = (e) => resolve(e.target.result);
+                });
+
+                const exportData = {
+                    timestamp: new Date().toISOString(),
+                    regions: regions,
+                    reports: reports,
+                    settings: {
+                        cx_gemini_key: localStorage.getItem('cx_gemini_key'),
+                        cx_use_proxy: localStorage.getItem('cx_use_proxy')
+                    }
+                };
+
+                // Create and download file
+                const blob = new Blob([JSON.stringify(exportData, null, 2)], { type: 'application/json' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `cx_dashboard_backup_${new Date().toISOString().slice(0, 10)}.json`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+            } catch (e) {
+                alert("Export failed: " + e.message);
+            }
+        }
+
+        async function importDatabase(input) {
+            const file = input.files[0];
+            if (!file) return;
+
+            if (!confirm("Warning: This will overwrite your current dashboard data with the data from the file. Continue?")) {
+                input.value = ''; // Reset input
+                return;
+            }
+
+            const reader = new FileReader();
+            reader.onload = async (e) => {
+                try {
+                    const data = JSON.parse(e.target.result);
+
+                    // Restore Settings
+                    if (data.settings) {
+                        if (data.settings.cx_gemini_key) localStorage.setItem('cx_gemini_key', data.settings.cx_gemini_key);
+                        if (data.settings.cx_use_proxy) localStorage.setItem('cx_use_proxy', data.settings.cx_use_proxy);
+                    }
+
+                    const db = await initDB();
+                    const tx = db.transaction([IDB_STORE_REGIONS, IDB_STORE_REPORTS], 'readwrite');
+
+                    // Clear existing stores
+                    await new Promise(resolve => tx.objectStore(IDB_STORE_REGIONS).clear().onsuccess = resolve);
+                    await new Promise(resolve => tx.objectStore(IDB_STORE_REPORTS).clear().onsuccess = resolve);
+
+                    // Restore Regions
+                    if (data.regions && Array.isArray(data.regions)) {
+                        const store = tx.objectStore(IDB_STORE_REGIONS);
+                        data.regions.forEach(item => store.put(item));
+                    }
+
+                    // Restore Reports
+                    if (data.reports && Array.isArray(data.reports)) {
+                        const store = tx.objectStore(IDB_STORE_REPORTS);
+                        data.reports.forEach(item => store.put(item));
+                    }
+
+                    tx.oncomplete = () => {
+                        alert('Database restored successfully! The page will now reload.');
+                        location.reload();
+                    };
+                } catch (err) {
+                    console.error(err);
+                    alert('Failed to import database: ' + err.message);
+                }
+            };
+            reader.readAsText(file);
+        }
+    </script>
+</body>
+
+</html>
