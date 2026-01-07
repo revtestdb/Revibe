@@ -112,8 +112,8 @@
     </div>
 
     <!-- Sidebar Filters -->
-    <aside class="w-64 glass h-full flex-shrink-0 flex flex-col p-6 border-r border-slate-700/50 relative z-20">
-        <div class="mb-8 flex items-center gap-3">
+    <aside class="w-64 glass h-full flex-shrink-0 flex flex-col p-4 border-r border-slate-700/50 relative z-20">
+        <div class="mb-5 flex items-center gap-3">
             <div
                 class="w-10 h-10 bg-gradient-to-br from-accent-blue to-accent-purple rounded-lg flex items-center justify-center text-white font-bold">
                 <i class="fa-solid fa-headset"></i>
@@ -121,12 +121,12 @@
             <h1 class="text-xl font-bold tracking-wide">CX Analytics</h1>
         </div>
 
-        <div class="space-y-6">
+        <div class="space-y-3">
             <!-- Country Selector -->
             <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Region</label>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Region</label>
                 <select id="countryFilter"
-                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-sm text-white focus:ring-accent-blue focus:border-accent-blue">
+                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white focus:ring-accent-blue focus:border-accent-blue">
                     <option value="All">All Regions</option>
                     <option value="KSA">KSA (Saudi Arabia)</option>
                     <option value="UAE">UAE (United Arab Emirates)</option>
@@ -136,9 +136,9 @@
 
             <!-- Source Selector -->
             <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Source</label>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Source</label>
                 <select id="sourceFilter"
-                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2.5 text-sm text-white focus:ring-accent-blue focus:border-accent-blue">
+                    class="w-full bg-slate-800 border border-slate-600 rounded-lg p-2 text-xs text-white focus:ring-accent-blue focus:border-accent-blue">
                     <option value="Widget">Chat Widget</option>
                     <option value="Whatsapp">Whatsapp</option>
                 </select>
@@ -146,7 +146,7 @@
 
             <!-- Date Range -->
             <div>
-                <label class="block text-sm font-medium text-gray-400 mb-2">Date Range</label>
+                <label class="block text-xs font-medium text-gray-400 mb-1">Date Range</label>
                 <div class="grid gap-3">
                     <div class="relative">
                         <div class="absolute inset-y-0 left-0 flex items-center pl-3 pointer-events-none">
@@ -166,7 +166,7 @@
             </div>
 
             <!-- Compare Toggle -->
-            <div class="flex items-center justify-between p-3 glass rounded-lg border border-slate-700">
+            <div class="flex items-center justify-between p-2 glass rounded-lg border border-slate-700">
                 <span class="text-xs font-medium text-gray-300">Compare Prev. Period</span>
                 <label class="relative inline-flex items-center cursor-pointer">
                     <input type="checkbox" id="compareToggle" class="sr-only peer">
@@ -176,27 +176,38 @@
                 </label>
             </div>
 
+            <!-- CSAT Filter Toggle -->
+            <div class="flex items-center justify-between p-2 glass rounded-lg border border-slate-700 mt-1">
+                <span class="text-xs font-medium text-gray-300">Show Rated Only (CSAT)</span>
+                <label class="relative inline-flex items-center cursor-pointer">
+                    <input type="checkbox" id="csatToggle" class="sr-only peer">
+                    <div
+                        class="w-9 h-5 bg-gray-600 peer-focus:outline-none peer-focus:ring-2 peer-focus:ring-accent-yellow rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-4 after:w-4 after:transition-all peer-checked:bg-accent-yellow">
+                    </div>
+                </label>
+            </div>
+
             <button onclick="applyFilters()"
-                class="w-full bg-gradient-to-r from-accent-blue to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium py-2.5 rounded-lg shadow-lg transition-all transform hover:scale-105">
+                class="w-full bg-gradient-to-r from-accent-blue to-indigo-600 hover:from-blue-600 hover:to-indigo-700 text-white font-medium py-2 rounded-lg shadow-lg transition-all transform hover:scale-105 text-sm">
                 Apply Filters
             </button>
         </div>
 
-        <div class="mt-auto pt-6 border-t border-slate-700">
+        <div class="mt-auto pt-4 border-t border-slate-700">
             <button onclick="openSettings()"
-                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800">
+                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-1.5 py-1.5 rounded-lg hover:bg-slate-800 text-xs">
                 <i class="fa-solid fa-database"></i> Data Manager
             </button>
             <button onclick="openAIModal()"
-                class="w-full flex items-center justify-center gap-2 text-accent-purple hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-purple/50">
+                class="w-full flex items-center justify-center gap-2 text-accent-purple hover:text-white transition-colors mb-1.5 py-1.5 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-purple/50 text-xs">
                 <i class="fa-solid fa-wand-magic-sparkles"></i> AI Analyst
             </button>
             <button onclick="openN8nModal()"
-                class="w-full flex items-center justify-center gap-2 text-accent-yellow hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-yellow/50">
+                class="w-full flex items-center justify-center gap-2 text-accent-yellow hover:text-white transition-colors mb-1.5 py-1.5 rounded-lg hover:bg-slate-800 border border-slate-700 hover:border-accent-yellow/50 text-xs">
                 <i class="fa-solid fa-bolt"></i> N8N Control
             </button>
             <button onclick="openReportsArchive()"
-                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-2 py-2 rounded-lg hover:bg-slate-800">
+                class="w-full flex items-center justify-center gap-2 text-gray-400 hover:text-white transition-colors mb-1.5 py-1.5 rounded-lg hover:bg-slate-800 text-xs">
                 <i class="fa-solid fa-archive"></i> Reports Archive
             </button>
             <p id="dataStatusText" class="text-xs text-gray-500 text-center">Data fetched via API / CSV</p>
@@ -218,7 +229,7 @@
         </div>
 
         <!-- Section A: Executive KPI Cards -->
-        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+        <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-6 mb-8">
 
             <!-- Total Volume -->
             <div class="glass rounded-xl p-5 border-l-4 border-accent-purple relative overflow-hidden">
@@ -285,6 +296,22 @@
                     Indicator of automation depth
                 </div>
             </div>
+
+            <!-- Avg CSAT (New) -->
+            <div class="glass rounded-xl p-5 border-l-4 border-accent-yellow">
+                <div class="flex justify-between items-start">
+                    <div>
+                        <p class="text-sm text-gray-400 font-medium uppercase">Avg CSAT</p>
+                        <h3 id="kpiAvgCsat" class="text-3xl font-bold text-white mt-2">-</h3>
+                    </div>
+                    <div class="p-2 bg-slate-800 rounded-lg text-accent-yellow">
+                        <i class="fa-solid fa-star"></i>
+                    </div>
+                </div>
+                <div id="csatResponseRate" class="mt-4 text-xs font-medium text-gray-400">
+                    Response Rate: 0%
+                </div>
+            </div>
         </div>
 
         <!-- Section B: Charts -->
@@ -302,6 +329,14 @@
                 <h3 class="text-lg font-semibold mb-4 text-white">Category Distribution</h3>
                 <div class="relative h-64 w-full flex justify-center">
                     <canvas id="categoryChart"></canvas>
+                </div>
+            </div>
+
+            <!-- CSAT vs Sentiment Chart (New) -->
+            <div class="glass rounded-xl p-6 lg:col-span-3">
+                <h3 class="text-lg font-semibold mb-4 text-white">CSAT vs Sentiment Validation</h3>
+                <div class="relative h-64 w-full">
+                    <canvas id="csatChart"></canvas>
                 </div>
             </div>
         </div>
@@ -671,15 +706,27 @@
 
         // Pre-Init: Check Security
         if (SECURE_MODE) {
-            document.getElementById('securityModal').classList.remove('hidden');
-            document.getElementById('loader').classList.add('hidden'); // Hide loader, show lock
+            const storedConfig = localStorage.getItem('cx_secure_config');
+            if (storedConfig) {
+                try {
+                    activeDefaults = JSON.parse(storedConfig);
+                    initializeDatabaseState();
+                } catch (e) {
+                    localStorage.removeItem('cx_secure_config');
+                    document.getElementById('securityModal').classList.remove('hidden');
+                    document.getElementById('loader').classList.add('hidden');
+                }
+            } else {
+                document.getElementById('securityModal').classList.remove('hidden');
+                document.getElementById('loader').classList.add('hidden');
+            }
         } else {
             activeDefaults = PLAIN_DEFAULTS;
             initializeDatabaseState();
         }
 
         window.onload = async function () {
-            if (SECURE_MODE) return; // Wait for unlock
+            if (SECURE_MODE && Object.keys(activeDefaults).length === 0) return;
             await startApp();
         };
 
@@ -759,6 +806,9 @@
                 if (!decryptedString) throw new Error("Invalid Password");
 
                 activeDefaults = JSON.parse(decryptedString);
+
+                // Save to LocalStorage for persistence
+                localStorage.setItem('cx_secure_config', decryptedString);
 
                 // Success
                 document.getElementById('securityModal').classList.add('hidden');
@@ -1037,6 +1087,7 @@
             endVal.setHours(23, 59, 59, 999);
 
             const isCompare = document.getElementById('compareToggle').checked;
+            const isCsatOnly = document.getElementById('csatToggle').checked;
 
             // Determine which DB key to use
             if (countryVal === 'All') {
@@ -1090,7 +1141,14 @@
                 // Country Check (Only if column exists, otherwise ignore)
                 const countryValid = (countryVal === 'All') ? true : (rowCountry === countryVal || rowCountry.startsWith(countryVal));
 
-                return dateValid && countryValid;
+                // CSAT Check
+                let csatValid = true;
+                if (isCsatOnly) {
+                    const c = parseInt(row['C-sat']);
+                    csatValid = !isNaN(c) && c >= 1 && c <= 5;
+                }
+
+                return dateValid && countryValid && csatValid;
             });
 
             console.log("Filtered Data:", filteredData.length);
@@ -1177,6 +1235,22 @@
             });
             const avg = countWithMsg > 0 ? (msgSum / countWithMsg).toFixed(1) : '-';
             document.getElementById('kpiAvgMsgs').innerText = avg;
+
+            // 5. CSAT
+            const csatScores = data
+                .map(r => parseInt(r['C-sat']))
+                .filter(n => !isNaN(n) && n >= 1 && n <= 5);
+
+            const avgCsat = csatScores.length > 0
+                ? (csatScores.reduce((a, b) => a + b, 0) / csatScores.length).toFixed(1)
+                : '-';
+
+            const responseRate = total > 0
+                ? ((csatScores.length / total) * 100).toFixed(1) + '%'
+                : '0%';
+
+            document.getElementById('kpiAvgCsat').innerText = avgCsat;
+            document.getElementById('csatResponseRate').innerText = `Response Rate: ${responseRate}`;
         }
 
         function updateCharts(data) {
@@ -1210,10 +1284,12 @@
             // Sort intents and take top 5
             const sortedIntents = Object.entries(intentCounts).sort((a, b) => b[1] - a[1]).slice(0, 5);
 
+
             // --- RENDER CHARTS ---
             destroyChart('volumeChart');
             destroyChart('categoryChart');
             destroyChart('intentChart');
+            destroyChart('csatChart');
 
             // 1. Line Chart
             const ctx1 = document.getElementById('volumeChart').getContext('2d');
@@ -1265,6 +1341,43 @@
                 options: {
                     indexAxis: 'y',
                     ...getChartOptions('bar')
+                }
+            });
+
+            // 4. CSAT vs Sentiment Stacked Bar
+            const sentimentOrder = ['Negative', 'Neutral', 'Positive'];
+            const csatBuckets = {
+                'Negative': [0, 0, 0, 0, 0],
+                'Neutral': [0, 0, 0, 0, 0],
+                'Positive': [0, 0, 0, 0, 0]
+            };
+
+            data.forEach(r => {
+                const s = r['Sentiment'] || 'Neutral';
+                const c = parseInt(r['C-sat']);
+                if (sentimentOrder.includes(s) && !isNaN(c) && c >= 1 && c <= 5) {
+                    csatBuckets[s][c - 1]++; // c-1 because array is 0-indexed (Score 1 = index 0)
+                }
+            });
+
+            const csatDatasets = [
+                { label: '1 Star', data: sentimentOrder.map(s => csatBuckets[s][0]), backgroundColor: '#ef4444' },
+                { label: '2 Stars', data: sentimentOrder.map(s => csatBuckets[s][1]), backgroundColor: '#f97316' },
+                { label: '3 Stars', data: sentimentOrder.map(s => csatBuckets[s][2]), backgroundColor: '#eab308' },
+                { label: '4 Stars', data: sentimentOrder.map(s => csatBuckets[s][3]), backgroundColor: '#84cc16' },
+                { label: '5 Stars', data: sentimentOrder.map(s => csatBuckets[s][4]), backgroundColor: '#22c55e' }
+            ];
+
+            const ctx4 = document.getElementById('csatChart').getContext('2d');
+            charts['csatChart'] = new Chart(ctx4, {
+                type: 'bar',
+                data: { labels: sentimentOrder, datasets: csatDatasets },
+                options: {
+                    ...getChartOptions('bar'),
+                    scales: {
+                        x: { stacked: true, ticks: { color: '#94a3b8' }, grid: { display: false } },
+                        y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
+                    }
                 }
             });
         }
