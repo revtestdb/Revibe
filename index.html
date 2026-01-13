@@ -2130,6 +2130,191 @@
                 resultDiv.innerHTML = `<span class="text-accent-red">Error: ${e.message}</span>`;
             }
         }
+
+        // Global storage for expanded results
+        const expandedResultsStore = {};
+
+        async function generateTopIssues(key, containerId, title) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            const apiKey = localStorage.getItem('cx_gemini_key');
+            if (!apiKey) {
+                container.innerHTML = '<span class="text-accent-red text-xs">API Key missing. <a href="credentials.html" class="underline">Set it here</a>.</span>';
+                return;
+            }
+
+            container.innerHTML = '<div class="animate-pulse text-accent-blue text-xs flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i> AI Analyzing...</div>';
+            // Helper for status updates
+            const updateStatus = (msg) => {
+                container.innerHTML = `<div class="animate-pulse text-accent-blue text-xs flex flex-col gap-1">
+                    <div class="flex items-center gap-2"><i class="fa-solid fa-circle-notch fa-spin"></i> AI Analyzing...</div>
+                    <span class="text-[10px] text-gray-400 pl-6">${msg}</span>
+                </div>`;
+            };
+
+            updateStatus('Gathering data...');
+            await new Promise(r => setTimeout(r, 50)); // Allow UI to update
+
+            // 1. Gather and Clean Data
+            const values = [];
+            filteredData.forEach(row => {
+                // Try key as passed (snake_case), then Title Case fallback
+                let val = row[key] || row[title] || row[key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())];
+
+
+                if (val) {
+                    const clean = String(val).trim();
+                    const lower = clean.toLowerCase();
+                    // Exclude invalid values
+                    if (!['na', 'n/a', 'null', 'true', 'false', 'none', ''].includes(lower)) {
+                        values.push(clean);
+                    }
+                }
+            });
+
+            if (values.length === 0) {
+                container.innerHTML = '<span class="text-gray-500 italic text-xs">No valid data found.</span>';
+                return;
+            }
+
+            updateStatus(`Found ${values.length} items. Preparing payload...`);
+            await new Promise(r => setTimeout(r, 50));
+
+            // 2. Prepare Data for AI (Limit to avoid token overflow, e.g., 500 items)
+            const dataPayload = values.slice(0, 500).join('\n');
+
+            updateStatus(`Sending request to Gemini (${dataPayload.length} chars)...`);
+
+            const prompt = `
+            You are a Data Analyst. Analyze the following list of raw customer feedback regarding "${title}".
+            
+            TASK:
+            1. Cluster semantically similar issues (e.g., "Tabby rejected" and "Tabby not working" -> "Payment Method Rejected").
+            2. Count the occurrences of each cluster.
+            3. Return the Top 10 most frequent issues.
+
+            OUTPUT FORMAT:
+            Return ONLY a raw JSON array (no markdown) with objects:
+            [{"issue": "Short Title", "count": number, "description": "Brief summary of the specific complaints in this cluster"}]
+
+            DATA:
+            ${dataPayload}
+            `;
+
+            try {
+                const model = "gemini-2.5-flash";
+                const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                });
+
+                updateStatus('Response received. Parsing JSON...');
+                const data = await response.json();
+
+
+                if (!response.ok) throw new Error(data.error?.message || 'API Error');
+
+                const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+                if (!text) throw new Error('No response from AI');
+
+                // Extract JSON
+                const jsonMatch = text.match(/\[[\s\S]*\]/);
+                if (!jsonMatch) throw new Error('AI did not return valid JSON');
+
+
+                const result = JSON.parse(jsonMatch[0]);
+
+                // Store for expansion
+                const storeId = `${key}_${Date.now()}`;
+                expandedResultsStore[storeId] = { title, data: result };
+
+                // 3. Render Widget View (Top 3 only to save space)
+                let html = '<ul class="mt-2 space-y-1">';
+                result.slice(0, 3).forEach(item => {
+                    html += `
+                        <li class="flex justify-between text-xs border-b border-slate-700/50 pb-1">
+                            <span class="text-gray-300 truncate pr-2" title="${item.description}">${item.issue}</span>
+                            <span class="font-mono text-accent-blue">${item.count}</span>
+                        </li>`;
+                });
+                html += '</ul>';
+
+
+                // Expand Button
+                html += `
+                    <button onclick="openExpandedIssues('${storeId}')" class="mt-2 w-full text-[10px] bg-slate-800 hover:bg-slate-700 text-gray-300 py-1 rounded transition-colors">
+                        <i class="fa-solid fa-expand"></i> View Full Analysis
+                    </button>
+                `;
+
+                container.innerHTML = html;
+
+            } catch (e) {
+                console.error(e);
+                container.innerHTML = `<span class="text-accent-red text-xs">Error: ${e.message}</span>`;
+            }
+        }
+
+        function openExpandedIssues(storeId) {
+            const record = expandedResultsStore[storeId];
+            if (!record) return;
+
+            // Create or get modal
+            let modal = document.getElementById('expandedIssuesModal');
+            if (!modal) {
+                // Inject modal HTML if missing
+                const modalHtml = `
+                <div id="expandedIssuesModal" class="fixed inset-0 bg-slate-900/90 z-[60] hidden flex items-center justify-center p-4">
+                    <div class="glass w-full max-w-2xl rounded-xl border border-slate-700 flex flex-col max-h-[80vh]">
+                        <div class="p-4 border-b border-slate-700 flex justify-between items-center">
+                            <h3 id="expModalTitle" class="text-lg font-bold text-white">Analysis Results</h3>
+                            <button onclick="document.getElementById('expandedIssuesModal').classList.add('hidden')" class="text-gray-400 hover:text-white">
+                                <i class="fa-solid fa-times"></i>
+                            </button>
+                        </div>
+                        <div class="p-4 overflow-y-auto flex-1">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="text-xs text-gray-400 border-b border-slate-700">
+                                        <th class="p-2">Count</th>
+                                        <th class="p-2">Issue</th>
+                                        <th class="p-2">Description</th>
+                                    </tr>
+                                </thead>
+                                <tbody id="expModalBody" class="text-sm text-gray-200">
+                                </tbody>
+                            </table>
+                        </div>
+                        <div class="p-4 border-t border-slate-700 bg-slate-800/50 rounded-b-xl flex justify-end">
+                            <button onclick="document.getElementById('expandedIssuesModal').classList.add('hidden')" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-xs font-bold">Close</button>
+                        </div>
+                    </div>
+                </div>`;
+                document.body.insertAdjacentHTML('beforeend', modalHtml);
+                modal = document.getElementById('expandedIssuesModal');
+            }
+
+            // Populate Modal
+            document.getElementById('expModalTitle').innerText = `Top Issues: ${record.title}`;
+            const tbody = document.getElementById('expModalBody');
+            tbody.innerHTML = '';
+
+
+            record.data.forEach(item => {
+                const row = `
+                    <tr class="border-b border-slate-800 hover:bg-slate-700/30">
+                        <td class="p-2 font-mono text-accent-blue font-bold">${item.count}</td>
+                        <td class="p-2 font-semibold">${item.issue}</td>
+                        <td class="p-2 text-gray-400 text-xs">${item.description}</td>
+                    </tr>
+                `;
+                tbody.insertAdjacentHTML('beforeend', row);
+            });
+
+            modal.classList.remove('hidden');
+        }
     </script>
 </body>
 
