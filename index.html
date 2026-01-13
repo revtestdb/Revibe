@@ -674,9 +674,18 @@
             const today = new Date();
             const last30 = new Date();
             last30.setDate(today.getDate() - 30);
+            // Load persisted state (Filters & Dates)
+            if (!loadDashboardState()) {
+                // Set default dates (Last 30 days) only if no state saved
+                const today = new Date();
+                const last30 = new Date();
+                last30.setDate(today.getDate() - 30);
 
-            document.getElementById('endDate').valueAsDate = today;
-            document.getElementById('startDate').valueAsDate = last30;
+                document.getElementById('endDate').valueAsDate = today;
+                document.getElementById('startDate').valueAsDate = last30;
+                document.getElementById('endDate').valueAsDate = today;
+                document.getElementById('startDate').valueAsDate = last30;
+            }
 
             // Update Last Sync Text based on most recent DB update
             let latest = 'Never';
@@ -694,6 +703,9 @@
 
             // Initial Load
             applyFilters();
+
+            // Restore Generated Issues (AI Analysis)
+            loadSavedTopIssues();
 
             // Hide loader after initialization
             document.getElementById('loader').classList.add('hidden');
@@ -1087,6 +1099,8 @@
             updateKPIs(filteredData, prevData, isCompare);
             updateCharts(filteredData);
             updateAnalysis(filteredData);
+
+            saveDashboardState(); // Persist state on every filter change
         }
 
         // ==========================================
@@ -1383,6 +1397,43 @@
         }
 
         // ==========================================
+        // 💾 STATE PERSISTENCE
+        // ==========================================
+        const STATE_KEY = 'cx_dashboard_state';
+        const ISSUES_KEY_PREFIX = 'cx_issues_';
+
+        function saveDashboardState() {
+            const state = {
+                country: document.getElementById('countryFilter').value,
+                source: document.getElementById('sourceFilter').value,
+                start: document.getElementById('startDate').value,
+                end: document.getElementById('endDate').value,
+                compare: document.getElementById('compareToggle').checked,
+                csat: document.getElementById('csatToggle').checked
+            };
+            localStorage.setItem(STATE_KEY, JSON.stringify(state));
+        }
+
+        function loadDashboardState() {
+            const raw = localStorage.getItem(STATE_KEY);
+            if (raw) {
+                try {
+                    const state = JSON.parse(raw);
+                    if (state.country) document.getElementById('countryFilter').value = state.country;
+                    if (state.source) document.getElementById('sourceFilter').value = state.source;
+                    if (state.start) document.getElementById('startDate').value = state.start;
+                    if (state.end) document.getElementById('endDate').value = state.end;
+                    if (state.compare !== undefined) document.getElementById('compareToggle').checked = state.compare;
+                    if (state.csat !== undefined) document.getElementById('csatToggle').checked = state.csat;
+                    return true;
+                } catch (e) {
+                    console.error("Failed to load dashboard state", e);
+                }
+            }
+            return false;
+        }
+
+        // ==========================================
         // 🛠️ CHART UTILS
         // ==========================================
         function getChartOptions(type) {
@@ -1536,9 +1587,14 @@
                 const title = `Analysis for ${report.context.region}`;
                 const date = new Date(report.savedAt).toLocaleString();
                 const html = `
-                    <div onclick="displayReport(${report.id})" class="p-3 rounded-lg hover:bg-slate-700 cursor-pointer border-b border-slate-800">
-                        <p class="font-bold text-sm text-white">${title}</p>
-                        <p class="text-xs text-gray-400">${date}</p>
+                    <div class="p-3 rounded-lg hover:bg-slate-700 border-b border-slate-800 flex justify-between items-center group transition-colors">
+                        <div onclick="displayReport(${report.id})" class="cursor-pointer flex-1">
+                            <p class="font-bold text-sm text-white">${title}</p>
+                            <p class="text-xs text-gray-400">${date}</p>
+                        </div>
+                        <button onclick="deleteReport(${report.id}); event.stopPropagation();" class="text-gray-500 hover:text-accent-red opacity-0 group-hover:opacity-100 transition-opacity px-2" title="Delete Report">
+                            <i class="fa-solid fa-trash"></i>
+                        </button>
                     </div>
                 `;
                 listEl.insertAdjacentHTML('beforeend', html);
@@ -2134,6 +2190,26 @@
         // Global storage for expanded results
         const expandedResultsStore = {};
 
+        function loadSavedTopIssues() {
+            const mapping = [
+                { key: 'website_issue', container: 'websiteIssueResults', title: 'Website Issue' },
+                { key: 'reason_not_buying', container: 'reasonNotBuyingResults', title: 'Reason Not Buying' },
+                { key: 'angry_reason', container: 'angryReasonResults', title: 'Angry Reason' },
+                { key: 'device_quality', container: 'deviceQualityResults', title: 'Device Quality' },
+                { key: 'pricing_topic', container: 'pricingTopicResults', title: 'Pricing Topic' }
+            ];
+
+            mapping.forEach(m => {
+                const saved = localStorage.getItem(ISSUES_KEY_PREFIX + m.key);
+                if (saved) {
+                    try {
+                        const data = JSON.parse(saved);
+                        renderTopIssuesWidget(m.key, m.container, data, m.title);
+                    } catch (e) { console.error(e); }
+                }
+            });
+        }
+
         async function generateTopIssues(key, containerId, title) {
             const container = document.getElementById(containerId);
             if (!container) return;
@@ -2156,79 +2232,123 @@
             updateStatus('Gathering data...');
             await new Promise(r => setTimeout(r, 50)); // Allow UI to update
 
-            // 1. Gather and Clean Data
-            const values = [];
+            // 1. Gather and Clean Data (Client-side Pre-aggregation)
+            const rawCounts = {};
             filteredData.forEach(row => {
                 // Try key as passed (snake_case), then Title Case fallback
                 let val = row[key] || row[title] || row[key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())];
-
 
                 if (val) {
                     const clean = String(val).trim();
                     const lower = clean.toLowerCase();
                     // Exclude invalid values
                     if (!['na', 'n/a', 'null', 'true', 'false', 'none', ''].includes(lower)) {
-                        values.push(clean);
+                        rawCounts[clean] = (rawCounts[clean] || 0) + 1;
                     }
                 }
             });
 
-            if (values.length === 0) {
+            // Convert to array and sort by frequency to prioritize top issues
+            const uniqueIssues = Object.entries(rawCounts)
+                .map(([text, count]) => ({ text, count }))
+                .sort((a, b) => b.count - a.count);
+
+            if (uniqueIssues.length === 0) {
                 container.innerHTML = '<span class="text-gray-500 italic text-xs">No valid data found.</span>';
                 return;
             }
 
-            updateStatus(`Found ${values.length} items. Preparing payload...`);
+            updateStatus(`Found ${uniqueIssues.length} unique issues. Preparing payload...`);
             await new Promise(r => setTimeout(r, 50));
 
-            // 2. Prepare Data for AI (Limit to avoid token overflow, e.g., 500 items)
-            const dataPayload = values.slice(0, 500).join('\n');
+            // 2. Batching Logic (Map-Reduce Strategy)
+            // We process up to 500 unique items to ensure coverage without excessive API calls
+            const itemsToProcess = uniqueIssues.slice(0, 500);
+            const BATCH_SIZE = 100;
+            const batches = [];
+            for (let i = 0; i < itemsToProcess.length; i += BATCH_SIZE) {
+                batches.push(itemsToProcess.slice(i, i + BATCH_SIZE));
+            }
 
-            updateStatus(`Sending request to Gemini (${dataPayload.length} chars)...`);
-
-            const prompt = `
-            You are a Data Analyst. Analyze the following list of raw customer feedback regarding "${title}".
-            
-            TASK:
-            1. Cluster semantically similar issues (e.g., "Tabby rejected" and "Tabby not working" -> "Payment Method Rejected").
-            2. Count the occurrences of each cluster.
-            3. Return the Top 10 most frequent issues.
-
-            OUTPUT FORMAT:
-            Return ONLY a raw JSON array (no markdown) with objects:
-            [{"issue": "Short Title", "count": number, "description": "Brief summary of the specific complaints in this cluster"}]
-
-            DATA:
-            ${dataPayload}
-            `;
-
-            try {
+            // Helper to call AI
+            const callAI = async (promptText) => {
                 const model = "gemini-2.5-flash";
                 const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`, {
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ contents: [{ parts: [{ text: prompt }] }] })
+                    body: JSON.stringify({ contents: [{ parts: [{ text: promptText }] }] })
                 });
-
-                updateStatus('Response received. Parsing JSON...');
+                if (!response.ok) {
+                    const d = await response.json();
+                    throw new Error(d.error?.message || 'API Error');
+                }
                 const data = await response.json();
-
-
-                if (!response.ok) throw new Error(data.error?.message || 'API Error');
-
                 const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
                 if (!text) throw new Error('No response from AI');
-
-                // Extract JSON
                 const jsonMatch = text.match(/\[[\s\S]*\]/);
                 if (!jsonMatch) throw new Error('AI did not return valid JSON');
+                return JSON.parse(jsonMatch[0]);
+            };
 
+            try {
+                let aggregatedResults = [];
 
-                const result = JSON.parse(jsonMatch[0]);
+                // MAP PHASE: Process batches
+                for (let i = 0; i < batches.length; i++) {
+                    updateStatus(`Analyzing batch ${i + 1}/${batches.length} (${batches[i].length} items)...`);
+
+                    const batchPayload = batches[i].map(item => `"${item.text}" (Count: ${item.count})`).join('\n');
+                    const mapPrompt = `
+                    You are a Data Analyst. Analyze this partial list of customer feedback regarding "${title}".
+                    Input format: "Issue" (Count: N).
+                    
+                    TASK:
+                    1. Cluster semantically similar issues.
+                    2. Sum counts for each cluster.
+                    3. Return a JSON array of objects: [{"issue": "Title", "count": number, "description": "Brief summary"}]
+                    
+                    DATA:
+                    ${batchPayload}
+                    
+                    OUTPUT: JSON Array ONLY.
+                    `;
+
+                    const batchResult = await callAI(mapPrompt);
+                    aggregatedResults = aggregatedResults.concat(batchResult);
+
+                    // Small delay to prevent rate limiting
+                    if (i < batches.length - 1) await new Promise(r => setTimeout(r, 500));
+                }
+
+                // REDUCE PHASE: Unify results
+                let result = [];
+                if (batches.length > 1) {
+                    updateStatus('Unifying and ranking results...');
+                    const reducePayload = aggregatedResults.map(item => `"${item.issue}" (Count: ${item.count})`).join('\n');
+                    const reducePrompt = `
+                    You are a Data Analyst. I have processed data in batches and now need to merge them.
+                    Here is a list of categorized issues with counts. Some categories might overlap or be duplicates across batches.
+                    
+                    TASK:
+                    1. Merge duplicate or highly similar categories (e.g. "Tabby Error" and "Tabby Rejected").
+                    2. Sum their counts.
+                    3. Return the Top 10 most frequent issues.
+                    
+                    DATA:
+                    ${reducePayload}
+                    
+                    OUTPUT: JSON Array ONLY: [{"issue": "Title", "count": number, "description": "Brief summary"}]
+                    `;
+                    result = await callAI(reducePrompt);
+                } else {
+                    result = aggregatedResults.sort((a, b) => b.count - a.count).slice(0, 10);
+                }
 
                 // Store for expansion
                 const storeId = `${key}_${Date.now()}`;
                 expandedResultsStore[storeId] = { title, data: result };
+                // Save to LocalStorage
+                localStorage.setItem(ISSUES_KEY_PREFIX + key, JSON.stringify(result));
 
                 // 3. Render Widget View (Top 3 only to save space)
                 let html = '<ul class="mt-2 space-y-1">';
@@ -2240,6 +2360,8 @@
                         </li>`;
                 });
                 html += '</ul>';
+                // Render
+                renderTopIssuesWidget(key, containerId, result, title);
 
 
                 // Expand Button
@@ -2255,6 +2377,75 @@
                 console.error(e);
                 container.innerHTML = `<span class="text-accent-red text-xs">Error: ${e.message}</span>`;
             }
+        }
+
+        function renderTopIssuesWidget(key, containerId, result, title) {
+            const container = document.getElementById(containerId);
+            if (!container) return;
+
+            // Store for expansion
+            const storeId = `${key}_saved`;
+            expandedResultsStore[storeId] = { title, data: result };
+
+            // 1. Chart Canvas
+            let html = `<div class="h-24 w-full mb-3 mt-2"><canvas id="chart_${key}"></canvas></div>`;
+
+            // 2. List (Top 3)
+            html += '<ul class="space-y-1">';
+            result.slice(0, 3).forEach(item => {
+                html += `
+                    <li class="flex justify-between text-xs border-b border-slate-700/50 pb-1">
+                        <span class="text-gray-300 truncate pr-2" title="${item.description}">${item.issue}</span>
+                        <span class="font-mono text-accent-blue">${item.count}</span>
+                    </li>`;
+            });
+            html += '</ul>';
+
+            // 3. Expand Button
+            html += `
+                <button onclick="openExpandedIssues('${storeId}')" class="mt-2 w-full text-[10px] bg-slate-800 hover:bg-slate-700 text-gray-300 py-1 rounded transition-colors">
+                    <i class="fa-solid fa-expand"></i> View Full Analysis
+                </button>
+            `;
+
+            container.innerHTML = html;
+
+            // 4. Render Chart
+            setTimeout(() => {
+                const ctx = document.getElementById(`chart_${key}`);
+                if (ctx) {
+                    // Destroy existing if any
+                    if (charts[`chart_${key}`]) charts[`chart_${key}`].destroy();
+
+                    const top5 = result.slice(0, 5);
+                    charts[`chart_${key}`] = new Chart(ctx, {
+                        type: 'bar',
+                        data: {
+                            labels: top5.map(i => i.issue),
+                            datasets: [{
+                                label: 'Count',
+                                data: top5.map(i => i.count),
+                                backgroundColor: '#3b82f6',
+                                borderRadius: 3,
+                                barThickness: 10
+                            }]
+                        },
+                        options: {
+                            indexAxis: 'y',
+                            responsive: true,
+                            maintainAspectRatio: false,
+                            plugins: { legend: { display: false } },
+                            scales: {
+                                x: { display: false },
+                                y: {
+                                    ticks: { color: '#94a3b8', font: { size: 9 }, autoSkip: false },
+                                    grid: { display: false }
+                                }
+                            }
+                        }
+                    });
+                }
+            }, 50);
         }
 
         function openExpandedIssues(storeId) {
@@ -2287,7 +2478,8 @@
                                 </tbody>
                             </table>
                         </div>
-                        <div class="p-4 border-t border-slate-700 bg-slate-800/50 rounded-b-xl flex justify-end">
+                        <div class="p-4 border-t border-slate-700 bg-slate-800/50 rounded-b-xl flex justify-end gap-2">
+                            <button onclick="saveTopIssuesReport('${storeId}')" class="bg-accent-blue hover:bg-blue-600 text-white px-4 py-2 rounded text-xs font-bold"><i class="fa-solid fa-save mr-1"></i> Save Report</button>
                             <button onclick="document.getElementById('expandedIssuesModal').classList.add('hidden')" class="bg-slate-600 hover:bg-slate-500 text-white px-4 py-2 rounded text-xs font-bold">Close</button>
                         </div>
                     </div>
@@ -2314,6 +2506,56 @@
             });
 
             modal.classList.remove('hidden');
+        }
+
+        async function saveTopIssuesReport(storeId) {
+            const record = expandedResultsStore[storeId];
+            if (!record) return;
+
+            const region = document.getElementById('countryFilter').value;
+            const start = document.getElementById('startDate').value;
+            const end = document.getElementById('endDate').value;
+
+            // Generate HTML for the report
+            let html = `
+                <h3 class="text-xl font-bold text-white mb-2">Top Issues Analysis: ${record.title}</h3>
+                <p class="text-sm text-gray-400 mb-4"><strong>Region:</strong> ${region} | <strong>Date Range:</strong> ${start} to ${end}</p>
+                <table class="w-full text-left border-collapse border border-slate-700">
+                    <thead>
+                        <tr class="text-xs text-gray-400 border-b border-slate-700 bg-slate-800">
+                            <th class="p-2 border-r border-slate-700">Count</th>
+                            <th class="p-2 border-r border-slate-700">Issue</th>
+                            <th class="p-2">Description</th>
+                        </tr>
+                    </thead>
+                    <tbody class="text-sm text-gray-200">
+            `;
+
+            record.data.forEach(item => {
+                html += `
+                    <tr class="border-b border-slate-800">
+                        <td class="p-2 font-mono text-accent-blue font-bold border-r border-slate-800">${item.count}</td>
+                        <td class="p-2 font-semibold border-r border-slate-800">${item.issue}</td>
+                        <td class="p-2 text-gray-400 text-xs">${item.description}</td>
+                    </tr>
+                `;
+            });
+
+            html += `</tbody></table>`;
+
+            const reportData = {
+                savedAt: Date.now(),
+                context: { region, dateRange: { start, end } },
+                htmlContent: html
+            };
+
+            try {
+                await dbSaveReport(reportData);
+                alert("Report saved to Archive successfully!");
+            } catch (e) {
+                console.error(e);
+                alert("Failed to save report: " + e.message);
+            }
         }
     </script>
 </body>
