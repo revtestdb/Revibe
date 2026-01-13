@@ -389,6 +389,9 @@
                         <i class="fa-solid fa-desktop"></i>
                     </div>
                 </div>
+                <div class="h-16 w-full mt-3 mb-2 relative">
+                    <canvas id="kpiChartWebsite"></canvas>
+                </div>
                 <button onclick="generateTopIssues('website_issue', 'websiteIssueResults', 'Website Issue')"
                     class="mt-4 w-full bg-accent-yellow hover:bg-yellow-500 text-black py-2 rounded text-xs font-bold transition-colors shadow-lg">
                     Generate Top 10 Issues
@@ -406,6 +409,9 @@
                     <div class="p-2 bg-slate-800 rounded-lg text-accent-red">
                         <i class="fa-solid fa-cart-arrow-down"></i>
                     </div>
+                </div>
+                <div class="h-16 w-full mt-3 mb-2 relative">
+                    <canvas id="kpiChartBuying"></canvas>
                 </div>
                 <button onclick="generateTopIssues('reason_not_buying', 'reasonNotBuyingResults', 'Reason Not Buying')"
                     class="mt-4 w-full bg-accent-red hover:bg-red-600 text-white py-2 rounded text-xs font-bold transition-colors shadow-lg">
@@ -425,6 +431,9 @@
                         <i class="fa-solid fa-face-angry"></i>
                     </div>
                 </div>
+                <div class="h-16 w-full mt-3 mb-2 relative">
+                    <canvas id="kpiChartAngry"></canvas>
+                </div>
                 <button onclick="generateTopIssues('angry_reason', 'angryReasonResults', 'Angry Reason')"
                     class="mt-4 w-full bg-accent-purple hover:bg-purple-600 text-white py-2 rounded text-xs font-bold transition-colors shadow-lg">
                     Generate Top 10 Issues
@@ -443,6 +452,9 @@
                         <i class="fa-solid fa-mobile-screen-button"></i>
                     </div>
                 </div>
+                <div class="h-16 w-full mt-3 mb-2 relative">
+                    <canvas id="kpiChartQuality"></canvas>
+                </div>
                 <button onclick="generateTopIssues('device_quality', 'deviceQualityResults', 'Device Quality')"
                     class="mt-4 w-full bg-accent-green hover:bg-green-600 text-white py-2 rounded text-xs font-bold transition-colors shadow-lg">
                     Generate Top 10 Issues
@@ -460,6 +472,9 @@
                     <div class="p-2 bg-slate-800 rounded-lg text-accent-blue">
                         <i class="fa-solid fa-tags"></i>
                     </div>
+                </div>
+                <div class="h-16 w-full mt-3 mb-2 relative">
+                    <canvas id="kpiChartPricing"></canvas>
                 </div>
                 <button onclick="generateTopIssues('pricing_topic', 'pricingTopicResults', 'Pricing Topic')"
                     class="mt-4 w-full bg-accent-blue hover:bg-blue-600 text-white py-2 rounded text-xs font-bold transition-colors shadow-lg">
@@ -1197,6 +1212,13 @@
             document.getElementById('kpiAngryReason').innerText = angryReasonCount.toLocaleString();
             document.getElementById('kpiDeviceQuality').innerText = deviceQualityCount.toLocaleString();
             document.getElementById('kpiPricingTopic').innerText = pricingTopicCount.toLocaleString();
+
+            // Update Mini Charts
+            updateMiniKPIChart('kpiChartWebsite', websiteIssueCount, total, '#f59e0b');
+            updateMiniKPIChart('kpiChartBuying', reasonNotBuyingCount, total, '#ef4444');
+            updateMiniKPIChart('kpiChartAngry', angryReasonCount, total, '#8b5cf6');
+            updateMiniKPIChart('kpiChartQuality', deviceQualityCount, total, '#10b981');
+            updateMiniKPIChart('kpiChartPricing', pricingTopicCount, total, '#3b82f6');
         }
 
         function updateCharts(data) {
@@ -1325,6 +1347,62 @@
                         y: { stacked: true, ticks: { color: '#94a3b8' }, grid: { color: '#334155' } }
                     }
                 }
+            });
+        }
+
+        function updateMiniKPIChart(canvasId, count, total, color) {
+            const ctx = document.getElementById(canvasId);
+            if (!ctx) return;
+
+            if (charts[canvasId]) {
+                charts[canvasId].destroy();
+            }
+
+            const percentage = total > 0 ? ((count / total) * 100).toFixed(1) : 0;
+            const remaining = total - count;
+
+            charts[canvasId] = new Chart(ctx, {
+                type: 'doughnut',
+                data: {
+                    labels: ['With Issue', 'Others'],
+                    datasets: [{
+                        data: [count, remaining],
+                        backgroundColor: [color, 'rgba(255, 255, 255, 0.05)'],
+                        borderWidth: 0,
+                        borderRadius: 2
+                    }]
+                },
+                options: {
+                    responsive: true,
+                    maintainAspectRatio: false,
+                    cutout: '70%',
+                    plugins: {
+                        legend: { display: false },
+                        tooltip: { enabled: false }
+                    },
+                    animation: { duration: 500 }
+                },
+                plugins: [{
+                    id: 'textCenter',
+                    beforeDraw: function (chart) {
+                        const width = chart.width;
+                        const height = chart.height;
+                        const ctx = chart.ctx;
+
+                        ctx.restore();
+                        const fontSize = (height / 50).toFixed(2);
+                        ctx.font = "bold " + fontSize + "em sans-serif";
+                        ctx.textBaseline = "middle";
+                        ctx.fillStyle = "#94a3b8";
+
+                        const text = percentage + "%";
+                        const textX = Math.round((width - ctx.measureText(text).width) / 2);
+                        const textY = height / 2;
+
+                        ctx.fillText(text, textX, textY);
+                        ctx.save();
+                    }
+                }]
             });
         }
 
