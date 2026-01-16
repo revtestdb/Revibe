@@ -425,26 +425,4 @@ function ti_jsonToCSV(arr) {
     const headers = Object.keys(arr[0]);
     const rows = [headers.join(',')];
     for (const obj of arr) {
-        const row = headers.map(h => `"${String(obj[h] || '').replace(/"/g, '""')}"`);
-        rows.push(row.join(','));
-    }
-    return rows.join('\n');
-}
-
-function ti_parseCSV(text) {
-    // Use PapaParse if available (it is included in index.html)
-    if (typeof Papa !== 'undefined') {
-        const result = Papa.parse(text, { header: true, skipEmptyLines: true });
-        return result.data;
-    } else {
-        // Fallback for basic CSVs
-        const lines = text.split('\n').filter(l => l.trim());
-        const headers = lines[0].split(',').map(h => h.trim().replace(/"/g, ''));
-        return lines.slice(1).map(line => {
-            const values = line.split(','); // Note: This is a basic split, doesn't handle commas in quotes well
-            const obj = {};
-            headers.forEach((h, i) => obj[h] = (values[i] || '').trim().replace(/"/g, ''));
-            return obj;
-        });
-    }
-}
+        const row = headers.map(h => `"${String(obj[h] || '').replace(/

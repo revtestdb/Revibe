@@ -12,8 +12,21 @@
         </div>
         <div class="flex-1 grid grid-cols-3 gap-6 overflow-hidden">
             <!-- Left Column: Timeline -->
-            <div id="reportsList" class="col-span-1 bg-slate-900/50 rounded-lg p-4 overflow-y-auto">
-                <p class="text-gray-500 text-sm italic">No reports saved yet.</p>
+            <div class="col-span-1 bg-slate-900/50 rounded-lg p-4 flex flex-col">
+                <div class="flex justify-between items-center mb-3 pb-2 border-b border-slate-700">
+                    <label class="flex items-center gap-2 text-xs text-gray-400 cursor-pointer hover:text-white">
+                        <input type="checkbox" id="selectAllReports" onchange="toggleSelectAllReports(this)"
+                            class="rounded bg-slate-800 border-slate-600 focus:ring-accent-blue">
+                        Select All
+                    </label>
+                    <button onclick="downloadSelectedReports()"
+                        class="text-xs bg-slate-700 hover:bg-slate-600 text-white px-2 py-1 rounded transition-colors border border-slate-600">
+                        <i class="fa-solid fa-download mr-1"></i> Download
+                    </button>
+                </div>
+                <div id="reportsList" class="flex-1 overflow-y-auto space-y-2">
+                    <p class="text-gray-500 text-sm italic">No reports saved yet.</p>
+                </div>
             </div>
             <!-- Right Column: Report Detail -->
             <div id="reportDetailView" class="col-span-2 bg-slate-800/50 rounded-lg p-6 overflow-y-auto">

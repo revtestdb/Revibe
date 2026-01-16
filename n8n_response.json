@@ -1,7 +1,0 @@
-{
-    "message": "This is a test response from the n8n webhook.",
-    "data": [
-        { "id": 1, "name": "Test Item 1" },
-        { "id": 2, "name": "Test Item 2" }
-    ]
-}

@@ -233,7 +233,7 @@
 
     </main>
 
-    <script src="automation_center.js"></script>
+    <script src="../js/automation_center.js"></script>
     <script type="module">
         import { GoogleGenerativeAI } from "https://esm.run/@google/generative-ai";
 
@@ -269,7 +269,7 @@
         }
 
         function changeStepType(selectElement) {
-            const stepElement = selectElement.closest('.bg-slate-800\\/50');
+            const stepElement = selectElement.closest('.bg-slate-800\/50');
             const stepType = selectElement.value;
             const configContainer = stepElement.querySelector('.step-config');
             configContainer.innerHTML = ''; // Clear previous config
@@ -297,7 +297,7 @@
         }
 
         function removeWorkflowStep(buttonElement) {
-            const stepElement = buttonElement.closest('.bg-slate-800\\/50');
+            const stepElement = buttonElement.closest('.bg-slate-800\/50');
             if (stepElement) {
                 stepElement.remove();
             }
@@ -429,10 +429,6 @@
             });
         });
     </script>
-</body>
-
-</html>
-</script>
 </body>
 
 </html>
